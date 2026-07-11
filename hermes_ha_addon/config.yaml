@@ -1,5 +1,5 @@
 name: Hermes Agent Chat
-version: "1.0.2"
+version: "1.0.3"
 slug: hermes_ha_addon
 description: Chat with your remote Hermes Agent from Home Assistant
 url: "https://github.com/simpleace15/hermes-ha-addon"
@@ -18,6 +18,7 @@ options:
   registry_port: "8641"
   default_profile: "default"
   manual_profiles: []
+  log_level: "info"
 schema:
   hermes_host: "str"
   hermes_api_key: "password"
@@ -26,3 +27,4 @@ schema:
   manual_profiles:
     - name: "str"
       port: "port"
+  log_level: "list(debug|info|warning|error|critical)"

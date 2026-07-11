@@ -1,3 +1,15 @@
+## 1.0.3 (2026-07-11)
+
+### Added
+- Configurable log level: debug, info, warning, error, critical (dropdown in HA add-on config)
+- Detailed logging on all API routes: profile discovery, session CRUD, chat streaming
+- Debug-level logging of every HTTP request/response to Hermes (URL, status, body)
+- Traceback logging on all exceptions when debug enabled
+
+### Fixed
+- Profile discovery now logs which URL it's fetching and what it got back
+- Session endpoints now log the target profile, port, and Hermes response status
+
 ## 1.0.2 (2026-07-11)
 
 ### Fixed

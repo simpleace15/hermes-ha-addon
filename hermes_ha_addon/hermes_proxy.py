@@ -67,16 +67,20 @@ class HermesProxy:
         Falls back to manual_profiles if registry is unavailable.
         Returns a list of profile dicts: {name, port, model, status}
         """
+        log.info("discover_profiles: host=%s registry_port=%s", self.hermes_host, self.registry_port)
         if self.manual_profiles:
-            log.info("Using manual profiles config (%d entries)", len(self.manual_profiles))
+            log.info("discover_profiles: using manual profiles config (%d entries)", len(self.manual_profiles))
             return self._check_manual_profiles()
 
+        registry_url = self.registry_url("profiles")
+        log.debug("discover_profiles: fetching %s", registry_url)
         try:
             resp = requests.get(
-                self.registry_url("profiles"),
+                registry_url,
                 headers=self.auth_headers,
                 timeout=DEFAULT_TIMEOUT,
             )
+            log.debug("discover_profiles: registry returned status=%d", resp.status_code)
             resp.raise_for_status()
             data = resp.json()
 
@@ -94,10 +98,11 @@ class HermesProxy:
             return profiles
 
         except requests.RequestException as e:
-            log.warning("Registry unavailable: %s — falling back to manual profiles", e)
+            log.warning("discover_profiles: registry unavailable: %s — falling back", e)
             if self.manual_profiles:
                 return self._check_manual_profiles()
             # Last resort: assume just the default profile on the default port
+            log.warning("discover_profiles: no registry, no manual profiles — assuming default on port 8642")
             return [{
                 "name": self.default_profile,
                 "port": 8642,
@@ -137,23 +142,29 @@ class HermesProxy:
     def _proxy_get(self, port, path, params=None):
         """Proxy a GET request to a Hermes profile."""
         url = self.profile_url(port, path)
+        log.debug("GET %s params=%s", url, params)
         resp = requests.get(
             url, headers=self.auth_headers, params=params, timeout=DEFAULT_TIMEOUT
         )
+        log.debug("GET %s → status=%d len=%d", url, resp.status_code, len(resp.content))
         return resp
 
     def _proxy_post(self, port, path, json_data=None):
         """Proxy a POST request to a Hermes profile."""
         url = self.profile_url(port, path)
+        log.debug("POST %s json=%s", url, json_data)
         resp = requests.post(
             url, headers=self.auth_headers, json=json_data, timeout=DEFAULT_TIMEOUT
         )
+        log.debug("POST %s → status=%d len=%d", url, resp.status_code, len(resp.content))
         return resp
 
     def _proxy_delete(self, port, path):
         """Proxy a DELETE request to a Hermes profile."""
         url = self.profile_url(port, path)
+        log.debug("DELETE %s", url)
         resp = requests.delete(url, headers=self.auth_headers, timeout=DEFAULT_TIMEOUT)
+        log.debug("DELETE %s → status=%d", url, resp.status_code)
         return resp
 
     # ── Sessions ──────────────────────────────────────────────────────

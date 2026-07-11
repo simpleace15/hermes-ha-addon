@@ -8,6 +8,7 @@ Hermes API server. Designed for HA Ingress (path prefix aware).
 import json
 import logging
 import os
+import traceback
 
 from flask import (
     Flask, request, jsonify, Response, send_from_directory,
@@ -17,18 +18,12 @@ from flask import (
 from hermes_proxy import HermesProxy, HermesAPIError
 from profile_registry import ProfileRegistry
 
-# ── Logging ──────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
-log = logging.getLogger("hermes_addon")
-
 # ── Config from HA add-on options ─────────────────────────────────────
 HERMES_HOST = os.environ.get("HERMES_HOST", "")
 HERMES_API_KEY = os.environ.get("HERMES_API_KEY", "")
 REGISTRY_PORT = os.environ.get("REGISTRY_PORT", "8641")
 DEFAULT_PROFILE = os.environ.get("DEFAULT_PROFILE", "default")
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "info").upper()
 
 # Manual profiles come as JSON string from HA options
 _manual_raw = os.environ.get("MANUAL_PROFILES", "[]")
@@ -36,6 +31,22 @@ try:
     MANUAL_PROFILES = json.loads(_manual_raw) if _manual_raw else []
 except (json.JSONDecodeError, TypeError):
     MANUAL_PROFILES = []
+
+# ── Logging ──────────────────────────────────────────────────────────
+LEVELS = {
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+}
+logging.basicConfig(
+    level=LEVELS.get(LOG_LEVEL, logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+# Also set werkzeug (Flask request logger) to same level
+logging.getLogger("werkzeug").setLevel(LEVELS.get(LOG_LEVEL, logging.INFO))
+log = logging.getLogger("hermes_addon")
 
 # ── Flask App ─────────────────────────────────────────────────────────
 app = Flask(__name__, static_folder="static", static_url_path="/static")
@@ -61,10 +72,12 @@ registry = ProfileRegistry(proxy)
 
 def resolve_port(profile_name):
     """Look up a profile's port from the registry cache."""
+    log.debug("resolve_port: looking up profile=%s", profile_name)
     port = registry.get_port(profile_name)
     if port:
+        log.debug("resolve_port: found port=%s for profile=%s", port, profile_name)
         return port
-    # Fallback: default port
+    log.warning("resolve_port: profile=%s not found in registry, falling back to port 8642", profile_name)
     return 8642
 
 
@@ -95,11 +108,17 @@ def health():
 @app.route("/api/profiles")
 def api_profiles():
     """Return discovered profiles from the registry."""
+    log.info("GET /api/profiles — requesting profile discovery")
+    log.debug("  HERMES_HOST=%s  REGISTRY_PORT=%s", HERMES_HOST, REGISTRY_PORT)
     try:
         profiles = registry.get_profiles(force_refresh=True)
+        log.info("GET /api/profiles — returned %d profiles", len(profiles))
+        for p in profiles:
+            log.debug("  profile: %s (port=%s, status=%s)", p.get("name"), p.get("port"), p.get("status"))
         return jsonify({"profiles": profiles, "default": DEFAULT_PROFILE})
     except Exception as e:
-        log.error("Profile discovery failed: %s", e)
+        log.error("GET /api/profiles — discovery failed: %s", e)
+        log.debug("  traceback: %s", traceback.format_exc())
         return jsonify({"profiles": [], "error": str(e)}), 502
 
 
@@ -110,12 +129,16 @@ def list_sessions():
     profile = get_profile_from_request()
     port = resolve_port(profile)
     limit = request.args.get("limit", 50, type=int)
+    log.info("GET /api/sessions — profile=%s port=%s limit=%s", profile, port, limit)
     try:
         resp = proxy.list_sessions(port, limit=limit)
+        log.info("GET /api/sessions — Hermes returned status=%d", resp.status_code)
+        log.debug("  response body: %s", resp.text[:500])
         return Response(resp.content, status=resp.status_code,
                         content_type=resp.headers.get("Content-Type", "application/json"))
     except Exception as e:
-        log.error("List sessions failed: %s", e)
+        log.error("GET /api/sessions — failed: %s", e)
+        log.debug("  traceback: %s", traceback.format_exc())
         return jsonify({"error": str(e)}), 502
 
 
@@ -124,12 +147,16 @@ def create_session():
     profile = get_profile_from_request()
     port = resolve_port(profile)
     data = request.get_json(silent=True) or {}
+    log.info("POST /api/sessions — profile=%s port=%s title=%s", profile, port, data.get("title"))
     try:
         resp = proxy.create_session(port, title=data.get("title"))
+        log.info("POST /api/sessions — Hermes returned status=%d", resp.status_code)
+        log.debug("  response body: %s", resp.text[:500])
         return Response(resp.content, status=resp.status_code,
                         content_type=resp.headers.get("Content-Type", "application/json"))
     except Exception as e:
-        log.error("Create session failed: %s", e)
+        log.error("POST /api/sessions — failed: %s", e)
+        log.debug("  traceback: %s", traceback.format_exc())
         return jsonify({"error": str(e)}), 502
 
 
