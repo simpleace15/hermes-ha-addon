@@ -105,16 +105,31 @@ def discover_profiles():
 
 
 def check_health(port, api_key, timeout=HEALTH_TIMEOUT):
-    """Quick health check on a Hermes API port."""
+    """Quick health check on a Hermes API port. Returns (status, actual_model)."""
     try:
         req = urllib.request.Request(
             f"http://127.0.0.1:{port}/health",
             headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
         )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return "online" if resp.status == 200 else "offline"
+            if resp.status != 200:
+                return "offline", None
+        # Also query the actual model name from /v1/models
+        try:
+            req2 = urllib.request.Request(
+                f"http://127.0.0.1:{port}/v1/models",
+                headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
+            )
+            with urllib.request.urlopen(req2, timeout=timeout) as resp2:
+                models = json.loads(resp2.read().decode())
+                data = models.get("data", [])
+                if data:
+                    return "online", data[0].get("id")
+        except Exception:
+            pass
+        return "online", None
     except (URLError, HTTPError, ConnectionError, socket.timeout, OSError):
-        return "offline"
+        return "offline", None
 
 
 def get_api_key():
@@ -125,12 +140,16 @@ def get_api_key():
 
 
 def build_response(api_key):
-    """Build the full profiles response with health checks."""
+    """Build the full profiles response with health checks and actual model names."""
     profiles = discover_profiles()
 
-    # Check health of each profile
+    # Check health of each profile and get the actual running model
     for p in profiles:
-        p["status"] = check_health(p["port"], api_key)
+        status, actual_model = check_health(p["port"], api_key)
+        p["status"] = status
+        if actual_model:
+            # Use the real model name from the running API server
+            p["model"] = actual_model
 
     # Determine host IP for the response
     host_ip = get_local_ip()

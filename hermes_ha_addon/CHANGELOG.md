@@ -1,3 +1,10 @@
+## 1.0.5 (2026-07-11)
+
+### Fixed
+- Registry script now queries /v1/models on each port and reports the **actual** running
+  model name instead of what's in .env — fixes mismatch where port 8642 says "default" in
+  config but network-admin is actually running there
+
 ## 1.0.4 (2026-07-11)
 
 ### Fixed
