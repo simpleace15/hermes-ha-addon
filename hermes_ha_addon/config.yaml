@@ -2,26 +2,27 @@ name: Hermes Agent Chat
 version: "1.0.0"
 slug: hermes_ha_addon
 description: Chat with your remote Hermes Agent from Home Assistant
+url: "https://github.com/simpleace15/hermes-ha-addon"
+arch:
+  - amd64
+  - aarch64
+  - armv7
 init: false
 ingress: true
 ingress_port: 8788
 panel_icon: "mdi:robot-outline"
 panel_title: Hermes Agent
-arch:
-  - amd64
-  - aarch64
-  - armv7
 options:
-  hermes_host: ""
+  hermes_host: "http://localhost"
   hermes_api_key: ""
   registry_port: "8641"
   default_profile: "default"
   manual_profiles: []
 schema:
-  hermes_host: "url"
+  hermes_host: "str"
   hermes_api_key: "password"
   registry_port: "port"
-  default_profile: "text"
+  default_profile: "str"
   manual_profiles:
     - name: "str"
       port: "port"
