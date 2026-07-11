@@ -160,7 +160,7 @@
             let firstToken = true;
 
             try {
-                const resp = await fetch('/api/chat', {
+                const resp = await fetch(HERMES_BASE + '/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

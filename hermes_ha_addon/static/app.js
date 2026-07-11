@@ -72,7 +72,7 @@
             this.setStatus('Discovering profiles...', 'connecting');
 
             try {
-                const resp = await fetch('/api/profiles');
+                const resp = await fetch(HERMES_BASE + '/api/profiles');
                 if (!resp.ok) {
                     this.setStatus('Failed to discover profiles', 'error');
                     this._renderProfileError('Could not reach the profile registry');
@@ -165,7 +165,7 @@
         async _checkConnection() {
             this.setConnectionStatus('connecting');
             try {
-                const resp = await fetch(`/api/capabilities?profile=${this.activeProfile}`);
+                const resp = await fetch(`${HERMES_BASE}/api/capabilities?profile=${this.activeProfile}`);
                 if (resp.ok) {
                     this.setConnectionStatus('online');
                 } else {

@@ -33,7 +33,7 @@
          */
         async fetchSessions() {
             try {
-                const resp = await fetch(`/api/sessions?profile=${this.app.activeProfile}&limit=50`);
+                const resp = await fetch(`${HERMES_BASE}/api/sessions?profile=${this.app.activeProfile}&limit=50`);
                 if (!resp.ok) {
                     console.error('Failed to fetch sessions:', resp.status);
                     this.sessions = [];
@@ -56,7 +56,7 @@
          */
         async createSession(title) {
             try {
-                const resp = await fetch('/api/sessions', {
+                const resp = await fetch(HERMES_BASE + '/api/sessions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json',
                                 'X-Hermes-Profile': this.app.activeProfile },
@@ -92,7 +92,7 @@
 
             try {
                 const resp = await fetch(
-                    `/api/sessions/${sessionId}/messages?profile=${this.app.activeProfile}`
+                    `${HERMES_BASE}/api/sessions/${sessionId}/messages?profile=${this.app.activeProfile}`
                 );
                 if (!resp.ok) {
                     console.error('Load session failed:', resp.status);
@@ -124,7 +124,7 @@
         async deleteSession(sessionId) {
             try {
                 const resp = await fetch(
-                    `/api/sessions/${sessionId}?profile=${this.app.activeProfile}`,
+                    `${HERMES_BASE}/api/sessions/${sessionId}?profile=${this.app.activeProfile}`,
                     { method: 'DELETE' }
                 );
                 if (!resp.ok) {
@@ -152,7 +152,7 @@
         async forkSession(sessionId) {
             try {
                 const resp = await fetch(
-                    `/api/sessions/${sessionId}/fork?profile=${this.app.activeProfile}`,
+                    `${HERMES_BASE}/api/sessions/${sessionId}/fork?profile=${this.app.activeProfile}`,
                     { method: 'POST' }
                 );
                 if (!resp.ok) {

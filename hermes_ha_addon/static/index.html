@@ -5,6 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hermes Agent Chat</title>
     <link rel="stylesheet" href="style.css">
+    <script>
+        // Detect HA Ingress path prefix from current URL
+        // HA Ingress serves under /api/hassio_ingress/<token>/
+        // We extract the prefix so all fetch() calls resolve correctly
+        (function() {
+            var path = window.location.pathname;
+            var prefix = '';
+            if (path.indexOf('/api/hassio_ingress/') === 0) {
+                // Extract /api/hassio_ingress/<token>
+                var parts = path.split('/');
+                // path = /api/hassio_ingress/<token>/index.html or similar
+                // parts = ['', 'api', 'hassio_ingress', '<token>', ...]
+                if (parts.length >= 4) {
+                    prefix = '/' + parts[1] + '/' + parts[2] + '/' + parts[3];
+                }
+            }
+            window.HERMES_BASE = prefix;
+            console.log('Hermes Ingress prefix:', window.HERMES_BASE);
+        })();
+    </script>
 </head>
 <body>
     <div id="app">

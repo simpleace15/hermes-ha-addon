@@ -40,7 +40,7 @@
          */
         async checkCapabilities() {
             try {
-                const resp = await fetch(`/api/capabilities?profile=${this.app.activeProfile}`);
+                const resp = await fetch(`${HERMES_BASE}/api/capabilities?profile=${this.app.activeProfile}`);
                 if (!resp.ok) return false;
                 const data = await resp.json();
                 // Check if file tools or file toolset is available

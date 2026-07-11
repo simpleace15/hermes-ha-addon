@@ -1,3 +1,11 @@
+## 1.0.4 (2026-07-11)
+
+### Fixed
+- **Ingress path prefix**: all frontend fetch() calls now prepend the HA Ingress token prefix
+  (window.HERMES_BASE) so they resolve correctly under /api/hassio_ingress/<token>/
+  instead of hitting the HA root path and getting 404s
+- Frontend was loading (HTML/CSS/JS served fine) but no API calls reached the backend
+
 ## 1.0.3 (2026-07-11)
 
 ### Added
