@@ -18,4 +18,4 @@ build/
 
 # Testing
 mock_server.py
-test_*.py
+test_*.py__pycache__/
