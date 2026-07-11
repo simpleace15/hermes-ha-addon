@@ -1,27 +1,39 @@
-#!/bin/bash
+#!/usr/bin/env bashio
 # HA add-on startup script
-# Reads options from the HA add-on config and starts the Flask app
+# Reads options from HA Supervisor via /data/options.json and starts Flask
 
 set -e
 
-# Read config options from the HA add-on environment
-# HA Supervisor injects options as environment variables or via /data/options.json
 OPTIONS_FILE="/data/options.json"
 
-if [ -f "$OPTIONS_FILE" ]; then
-    # Parse HA options JSON
-    HERMES_HOST=$(jq -r '.hermes_host // empty' "$OPTIONS_FILE")
-    HERMES_API_KEY=$(jq -r '.hermes_api_key // empty' "$OPTIONS_FILE")
-    REGISTRY_PORT=$(jq -r '.registry_port // "8641"' "$OPTIONS_FILE")
-    DEFAULT_PROFILE=$(jq -r '.default_profile // "default"' "$OPTIONS_FILE")
-    MANUAL_PROFILES=$(jq -r '.manual_profiles // [] | @json' "$OPTIONS_FILE")
+if bashio::config.exists 'hermes_host'; then
+    HERMES_HOST="$(bashio::config 'hermes_host')"
 else
-    # Fallback to environment variables (for development/testing)
-    HERMES_HOST="${HERMES_HOST:-}"
-    HERMES_API_KEY="${HERMES_API_KEY:-}"
-    REGISTRY_PORT="${REGISTRY_PORT:-8641}"
-    DEFAULT_PROFILE="${DEFAULT_PROFILE:-default}"
-    MANUAL_PROFILES="${MANUAL_PROFILES:-[]}"
+    HERMES_HOST=""
+fi
+
+if bashio::config.exists 'hermes_api_key'; then
+    HERMES_API_KEY="$(bashio::config 'hermes_api_key')"
+else
+    HERMES_API_KEY=""
+fi
+
+if bashio::config.exists 'registry_port'; then
+    REGISTRY_PORT="$(bashio::config 'registry_port')"
+else
+    REGISTRY_PORT="8641"
+fi
+
+if bashio::config.exists 'default_profile'; then
+    DEFAULT_PROFILE="$(bashio::config 'default_profile')"
+else
+    DEFAULT_PROFILE="default"
+fi
+
+# Manual profiles as JSON string
+MANUAL_PROFILES="$(bashio::config 'manual_profiles' 2>/dev/null || echo '[]')"
+if [ -z "$MANUAL_PROFILES" ] || [ "$MANUAL_PROFILES" = "null" ]; then
+    MANUAL_PROFILES="[]"
 fi
 
 export HERMES_HOST
@@ -30,10 +42,10 @@ export REGISTRY_PORT
 export DEFAULT_PROFILE
 export MANUAL_PROFILES
 
-echo "Starting Hermes Agent Chat add-on..."
-echo "  Hermes host: ${HERMES_HOST:-not configured}"
-echo "  Registry port: ${REGISTRY_PORT}"
-echo "  Default profile: ${DEFAULT_PROFILE}"
+bashio::log.info "Starting Hermes Agent Chat add-on..."
+bashio::log.info "  Hermes host: ${HERMES_HOST:-not configured}"
+bashio::log.info "  Registry port: ${REGISTRY_PORT}"
+bashio::log.info "  Default profile: ${DEFAULT_PROFILE}"
 
 cd /app
-exec python app.py
+exec python3 app.py

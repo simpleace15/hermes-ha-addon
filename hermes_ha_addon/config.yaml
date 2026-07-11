@@ -1,5 +1,5 @@
 name: Hermes Agent Chat
-version: "1.0.0"
+version: "1.0.1"
 slug: hermes_ha_addon
 description: Chat with your remote Hermes Agent from Home Assistant
 url: "https://github.com/simpleace15/hermes-ha-addon"
