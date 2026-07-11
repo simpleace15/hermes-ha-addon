@@ -1,0 +1,21 @@
+# Build artifacts / runtime
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+*.egg-info/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+mock_server.py
+test_*.py
