@@ -15,7 +15,8 @@ from flask import (
     stream_with_context
 )
 
-from hermes_proxy import HermesProxy, HermesAPIError
+import requests
+from hermes_proxy import HermesProxy, HermesAPIError, DEFAULT_TIMEOUT
 from profile_registry import ProfileRegistry
 
 # ── Config from HA add-on options ─────────────────────────────────────
@@ -261,6 +262,91 @@ def chat():
             "Connection": "keep-alive",
         },
     )
+
+
+@app.route("/api/sessions/<session_id>/chat/stream", methods=["POST"])
+def session_chat_stream(session_id):
+    """Proxy per-session streaming chat (POST /api/sessions/{id}/chat/stream)."""
+    data = request.get_json(silent=True) or {}
+    message = data.get("message", "")
+    profile = data.get("profile", DEFAULT_PROFILE)
+    port = resolve_port(profile)
+    log.info("Session chat stream: profile=%s port=%s session=%s", profile, port, session_id)
+    try:
+        resp = proxy.session_chat_stream(port, session_id, message)
+    except HermesAPIError as e:
+        return jsonify({"error": e.body}), e.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+    def generate():
+        try:
+            for line in resp.iter_lines():
+                if line:
+                    yield line + b"\n"
+                else:
+                    yield b"\n"
+        except Exception as e:
+            log.error("Session SSE stream interrupted: %s", e)
+            yield f'data: {json.dumps({"error": str(e)})}\n\n'.encode()
+        finally:
+            resp.close()
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+    )
+
+
+@app.route("/api/sessions/<session_id>", methods=["PATCH"])
+def update_session(session_id):
+    """Rename/update a session."""
+    profile = get_profile_from_request()
+    port = resolve_port(profile)
+    data = request.get_json(silent=True) or {}
+    log.info("PATCH /api/sessions/%s — title=%s", session_id, data.get("title"))
+    try:
+        url = proxy.profile_url(port, f"api/sessions/{session_id}")
+        resp = requests.patch(url, headers=proxy.auth_headers, json=data, timeout=DEFAULT_TIMEOUT)
+        return Response(resp.content, status=resp.status_code,
+                        content_type=resp.headers.get("Content-Type", "application/json"))
+    except Exception as e:
+        log.error("Update session failed: %s", e)
+        return jsonify({"error": str(e)}), 502
+
+
+# ── Routes: Approval ──────────────────────────────────────────────────
+
+@app.route("/api/approval", methods=["POST"])
+def approval():
+    """Proxy tool approval/denial to the Hermes API."""
+    data = request.get_json(silent=True) or {}
+    approval_id = data.get("approval_id", "")
+    approved = data.get("approved", False)
+    profile = data.get("profile", DEFAULT_PROFILE)
+    session_id = data.get("session_id")
+    port = resolve_port(profile)
+    log.info("Approval: profile=%s port=%s id=%s approved=%s", profile, port, approval_id, approved)
+
+    if not approval_id:
+        return jsonify({"error": "approval_id is required"}), 400
+
+    try:
+        # Use the run approval endpoint if we have a run_id, otherwise
+        # try the session approval endpoint
+        url = proxy.profile_url(port, f"v1/runs/{approval_id}/approval")
+        resp = requests.post(
+            url,
+            headers=proxy.auth_headers,
+            json={"approved": approved},
+            timeout=DEFAULT_TIMEOUT,
+        )
+        return Response(resp.content, status=resp.status_code,
+                        content_type=resp.headers.get("Content-Type", "application/json"))
+    except Exception as e:
+        log.error("Approval failed: %s", e)
+        return jsonify({"error": str(e)}), 502
 
 
 # ── Routes: Capabilities / Models / Skills / Toolsets ────────────────

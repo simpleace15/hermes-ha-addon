@@ -14,6 +14,7 @@
             this.currentPath = '.';
             this.loading = false;
             this.fileTree = [];
+            this.currentTab = 'files';
 
             document.getElementById('workspace-toggle').addEventListener('click', () => {
                 this.toggle();
@@ -21,6 +22,26 @@
             document.getElementById('workspace-close').addEventListener('click', () => {
                 this.hide();
             });
+
+            // Tab switching
+            document.querySelectorAll('.workspace-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    this._switchTab(tab.dataset.tab);
+                });
+            });
+        }
+
+        _switchTab(tabName) {
+            if (this.currentTab === tabName) return;
+            this.currentTab = tabName;
+            document.querySelectorAll('.workspace-tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.tab === tabName);
+            });
+            if (tabName === 'files') {
+                this.show();
+            } else if (tabName === 'skills') {
+                this.loadSkills();
+            }
         }
 
         toggle() {
@@ -31,7 +52,9 @@
         show() {
             this.visible = true;
             document.getElementById('workspace').style.display = 'flex';
-            if (this.fileTree.length === 0) {
+            if (this.currentTab === 'skills') {
+                this.loadSkills();
+            } else if (this.fileTree.length === 0) {
                 this.listFiles(this.currentPath);
             }
         }
@@ -239,6 +262,60 @@
         _renderError(msg) {
             const container = document.getElementById('workspace-content');
             container.innerHTML = `<div class="workspace-error">${this._escapeHtml(msg)}</div>`;
+        }
+
+        // ── Skills Browser ─────────────────────────────────────────────
+
+        async loadSkills() {
+            const container = document.getElementById('workspace-content');
+            if (!container) return;
+            container.innerHTML = '<div class="workspace-loading">Loading skills...</div>';
+
+            try {
+                const resp = await fetch(`${HERMES_BASE}/api/skills?profile=${this.app.activeProfile}`);
+                if (!resp.ok) {
+                    this._renderError(`Failed to load skills: ${resp.status}`);
+                    return;
+                }
+                const data = await resp.json();
+                const skills = data.data || data.skills || [];
+                if (skills.length === 0) {
+                    container.innerHTML = '<div class="workspace-placeholder">No skills found for this profile.</div>';
+                    return;
+                }
+                let html = '<div class="skill-list">';
+                skills.forEach(skill => {
+                    const name = this._escapeHtml(skill.name || 'Unknown');
+                    const desc = this._escapeHtml(skill.description || 'No description available');
+                    const category = skill.category ? this._escapeHtml(skill.category) : '';
+                    html += `<div class="skill-card" data-skill="${this._escapeAttr(skill.name || '')}">`;
+                    html += `<div class="skill-name">${name}</div>`;
+                    if (category) {
+                        html += `<div class="skill-category">${category}</div>`;
+                    }
+                    html += `<div class="skill-description">${desc}</div>`;
+                    html += '</div>';
+                });
+                html += '</div>';
+                container.innerHTML = html;
+
+                // Bind click events — clicking a skill sends /skill <name>
+                container.querySelectorAll('.skill-card').forEach(card => {
+                    card.addEventListener('click', () => {
+                        const skillName = card.dataset.skill;
+                        if (skillName) {
+                            this.app.send('/skill ' + skillName);
+                        }
+                    });
+                });
+            } catch (e) {
+                console.error('Skills load error:', e);
+                this._renderError(e.message);
+            }
+        }
+
+        _escapeAttr(text) {
+            return String(text).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
         _escapeHtml(text) {

@@ -34,6 +34,9 @@
             // Load profiles
             await this.loadProfiles();
 
+            // Load models
+            this.loadModels();
+
             // Fetch sessions for active profile
             if (this.activeProfile) {
                 this.sessionManager.fetchSessions();
@@ -51,6 +54,36 @@
             // Profile selector
             document.getElementById('profile-selector').addEventListener('change', (e) => {
                 this.switchProfile(e.target.value);
+            });
+
+            // Model selector
+            document.getElementById('model-selector').addEventListener('change', (e) => {
+                this.activeModel = e.target.value || null;
+                this._updateModelDisplay();
+            });
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                const mod = e.ctrlKey || e.metaKey;
+                if (mod && (e.key === 'k' || e.key === 'K')) {
+                    e.preventDefault();
+                    document.getElementById('message-input').focus();
+                } else if (mod && (e.key === 'n' || e.key === 'N')) {
+                    e.preventDefault();
+                    this.newSession();
+                } else if (mod && e.key === '/') {
+                    e.preventDefault();
+                    this.showHelp();
+                } else if (e.key === 'Escape') {
+                    if (this.workspace && this.workspace.visible) {
+                        this.workspace.hide();
+                    } else {
+                        const sidebar = document.getElementById('sidebar');
+                        if (sidebar && !sidebar.classList.contains('collapsed')) {
+                            sidebar.classList.add('collapsed');
+                        }
+                    }
+                }
             });
 
             // Close error banners (event delegation)
@@ -108,6 +141,9 @@
                 this.activeModel = profile ? profile.model : null;
                 this._updateModelDisplay();
 
+                // Load models for the active profile
+                this.loadModels();
+
                 // Check connection
                 this._checkConnection();
 
@@ -154,6 +190,9 @@
             // Reload sessions
             this.sessionManager.fetchSessions();
 
+            // Reload models for the new profile
+            this.loadModels();
+
             this.setStatus(`Switched to ${profileName}`, 'ok');
             this._checkConnection();
         }
@@ -165,6 +204,41 @@
             } else {
                 el.textContent = '';
             }
+        }
+
+        async loadModels() {
+            const selector = document.getElementById('model-selector');
+            if (!selector) return;
+            try {
+                const resp = await fetch(`${HERMES_BASE}/api/models?profile=${this.activeProfile}`);
+                if (!resp.ok) {
+                    console.warn('Failed to load models:', resp.status);
+                    return;
+                }
+                const data = await resp.json();
+                const models = data.data || data.models || [];
+                let html = '<option value="">Auto</option>';
+                models.forEach(m => {
+                    const id = m.id || m.name || m.model;
+                    if (!id) return;
+                    const label = m.name || id;
+                    const selected = this.activeModel === id ? 'selected' : '';
+                    html += `<option value="${this._escapeAttr(id)}" ${selected}>${this._escapeHtml(label)}</option>`;
+                });
+                selector.innerHTML = html;
+            } catch (e) {
+                console.warn('Model load error:', e);
+            }
+        }
+
+        _escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
+        }
+
+        _escapeAttr(text) {
+            return String(text).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
         async _checkConnection() {

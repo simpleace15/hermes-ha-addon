@@ -3,9 +3,18 @@
  *
  * Uses fetch() with ReadableStream for SSE (not EventSource, because
  * EventSource only supports GET and we need POST).
+ *
+ * Hermes SSE format:
+ *   data: {"choices": [{"delta": {"content": "..."}}]}     — OpenAI chunks
+ *   event: hermes.tool.progress                              — named events
+ *   data: {"tool": "execute_code", "status": "running", ...}
+ *   event: hermes.tool.complete
+ *   data: {"toolCallId": "call_abc", ...}
  */
 (function () {
     'use strict';
+
+    const MAX_RETRIES = 2;
 
     class ChatManager {
         constructor(app) {
@@ -13,6 +22,7 @@
             this.isStreaming = false;
             this.abortController = null;
             this.currentStream = null;
+            this.retryCount = 0;
 
             // Message history for the current session (sent to API)
             this.messages = [];
@@ -133,10 +143,11 @@
             this._hideCommandDropdown();
 
             // Build messages array for API
-            // If it's a passthrough command, send as-is; otherwise send the raw text
             const msgContent = parsed && parsed.isCommand ? parsed.raw : text;
             this.messages.push({ role: 'user', content: msgContent });
 
+            // Reset retry count on new message
+            this.retryCount = 0;
             // Start streaming
             await this._streamChat(this.messages);
         }
@@ -156,7 +167,6 @@
 
             this.abortController = new AbortController();
             let accumulatedText = '';
-            let toolProgressHtml = '';
             let firstToken = true;
 
             try {
@@ -188,71 +198,14 @@
                 this.app.setStatus('Streaming...', 'ok');
                 this.app.setConnectionStatus('online');
 
-                const reader = resp.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
+                const result = await this._processSSEStream(resp.body, bubble, accumulatedText, firstToken);
+                accumulatedText = result.accumulatedText;
+                firstToken = result.firstToken;
 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop(); // Keep incomplete last line in buffer
-
-                    for (const line of lines) {
-                        if (!line.trim()) continue;
-
-                        // SSE format: "data: {...}"
-                        if (line.startsWith('data: ')) {
-                            const dataStr = line.slice(6).trim();
-
-                            if (dataStr === '[DONE]') {
-                                // Stream complete
-                                break;
-                            }
-
-                            try {
-                                const data = JSON.parse(dataStr);
-                                this._handleSSEEvent(data, bubble, (text) => {
-                                    if (firstToken) {
-                                        bubble.innerHTML = '';
-                                        firstToken = false;
-                                    }
-                                    accumulatedText += text;
-                                    bubble.innerHTML = renderMarkdown(accumulatedText);
-                                    this._scrollToBottom();
-                                });
-                            } catch (e) {
-                                // Not valid JSON — might be a raw text line
-                                console.debug('Non-JSON SSE line:', dataStr);
-                            }
-                        }
-                    }
-                }
-
-                // Process any remaining buffer
-                if (buffer.trim() && buffer.startsWith('data: ')) {
-                    const dataStr = buffer.slice(6).trim();
-                    if (dataStr !== '[DONE]') {
-                        try {
-                            const data = JSON.parse(dataStr);
-                            this._handleSSEEvent(data, bubble, (text) => {
-                                if (firstToken) {
-                                    bubble.innerHTML = '';
-                                    firstToken = false;
-                                }
-                                accumulatedText += text;
-                                bubble.innerHTML = renderMarkdown(accumulatedText);
-                                this._scrollToBottom();
-                            });
-                        } catch (e) { /* ignore */ }
-                    }
-                }
-
-                // Add streaming cursor while waiting, remove when done
+                // Finalize
                 if (accumulatedText) {
                     bubble.innerHTML = renderMarkdown(accumulatedText);
+                    this._addCopyButtons(bubble);
                 } else if (firstToken) {
                     bubble.innerHTML = '<span class="text-faint">(empty response)</span>';
                 }
@@ -267,11 +220,24 @@
                     this.app.setStatus('Stopped', 'ok');
                     if (accumulatedText) {
                         bubble.innerHTML = renderMarkdown(accumulatedText);
+                        this._addCopyButtons(bubble);
                     } else {
                         bubble.innerHTML = '<span class="text-faint">(stopped)</span>';
                     }
                 } else {
                     console.error('Stream error:', e);
+                    // Auto-reconnect on network errors
+                    if (this.retryCount < MAX_RETRIES && !e.message.includes('40')) {
+                        this.retryCount++;
+                        this.app.setStatus(`Reconnecting (${this.retryCount}/${MAX_RETRIES})...`, 'connecting');
+                        bubble.innerHTML = `<div class="reconnect-banner">Connection lost. Retrying... (${this.retryCount}/${MAX_RETRIES})</div>`;
+                        await new Promise(r => setTimeout(r, 1000 * this.retryCount));
+                        // Retry with same messages
+                        this.isStreaming = false;
+                        bubble.remove();
+                        await this._streamChat(messages);
+                        return;
+                    }
                     bubble.innerHTML = `<div class="error-banner">Stream error: ${this._escapeHtml(e.message)}<span class="close-error">✕</span></div>`;
                     this.app.setStatus('Stream error', 'error');
                 }
@@ -283,9 +249,136 @@
         }
 
         /**
-         * Handle a single SSE event from the Hermes API.
+         * Process SSE stream — handles both named events and data-only events.
+         * Returns { accumulatedText, firstToken }.
          */
-        _handleSSEEvent(data, bubble, appendText) {
+        async _processSSEStream(body, bubble, accumulatedText, firstToken) {
+            const reader = body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let currentEventType = '';  // Track named event type
+
+            const appendText = (text) => {
+                if (firstToken) {
+                    bubble.innerHTML = '';
+                    firstToken = false;
+                }
+                accumulatedText += text;
+                bubble.innerHTML = renderMarkdown(accumulatedText);
+                this._scrollToBottom();
+            };
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // Keep incomplete last line in buffer
+
+                for (const line of lines) {
+                    const trimmed = line.trim();
+
+                    // Empty line = SSE event boundary, reset event type
+                    if (!trimmed) {
+                        currentEventType = '';
+                        continue;
+                    }
+
+                    // Named event line: "event: hermes.tool.progress"
+                    if (trimmed.startsWith('event: ')) {
+                        currentEventType = trimmed.slice(7).trim();
+                        continue;
+                    }
+
+                    // Data line
+                    if (trimmed.startsWith('data: ')) {
+                        const dataStr = trimmed.slice(6).trim();
+
+                        if (dataStr === '[DONE]') {
+                            currentEventType = '';
+                            continue;
+                        }
+
+                        try {
+                            const data = JSON.parse(dataStr);
+
+                            // If we have a named event type, use it
+                            if (currentEventType) {
+                                this._handleNamedEvent(currentEventType, data, bubble, appendText);
+                            } else {
+                                // Standard OpenAI chunk (no event type)
+                                this._handleDataEvent(data, bubble, appendText);
+                            }
+                        } catch (e) {
+                            // Not valid JSON — might be a raw text line
+                            console.debug('Non-JSON SSE line:', dataStr);
+                        }
+
+                        // Reset event type after processing data
+                        currentEventType = '';
+                    }
+                }
+            }
+
+            // Process any remaining buffer
+            if (buffer.trim() && buffer.startsWith('data: ')) {
+                const dataStr = buffer.slice(6).trim();
+                if (dataStr !== '[DONE]') {
+                    try {
+                        const data = JSON.parse(dataStr);
+                        if (currentEventType) {
+                            this._handleNamedEvent(currentEventType, data, bubble, appendText);
+                        } else {
+                            this._handleDataEvent(data, bubble, appendText);
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+            }
+
+            return { accumulatedText, firstToken };
+        }
+
+        /**
+         * Handle a named SSE event (event: xxx).
+         */
+        _handleNamedEvent(eventType, data, bubble, appendText) {
+            switch (eventType) {
+                case 'hermes.tool.progress':
+                case 'tool.progress':
+                    this._renderToolProgress(bubble, data);
+                    break;
+
+                case 'hermes.tool.complete':
+                case 'tool.complete':
+                    this._renderToolComplete(bubble, data);
+                    break;
+
+                case 'hermes.approval.requested':
+                case 'approval.requested':
+                    this._renderApprovalDialog(bubble, data);
+                    break;
+
+                case 'hermes.approval.resolved':
+                case 'approval.resolved':
+                    this._renderApprovalResolved(bubble, data);
+                    break;
+
+                default:
+                    // Unknown named event — check if it has content
+                    if (data.delta) {
+                        appendText(data.delta);
+                    } else if (data.content) {
+                        appendText(data.content);
+                    }
+                    console.debug('Unhandled SSE event:', eventType, data);
+            }
+        }
+
+        /**
+         * Handle a data-only SSE event (no event: line).
+         */
+        _handleDataEvent(data, bubble, appendText) {
             // Standard OpenAI chat.completion.chunk
             if (data.choices && data.choices[0]) {
                 const delta = data.choices[0].delta;
@@ -295,7 +388,7 @@
                 return;
             }
 
-            // Hermes tool.progress event
+            // Hermes tool.progress event (legacy — some endpoints embed it in data)
             if (data.event === 'hermes.tool.progress' || data.type === 'tool.progress') {
                 this._renderToolProgress(bubble, data);
                 return;
@@ -318,28 +411,45 @@
                 appendText(data.content);
                 return;
             }
+
+            // Run events (message.delta, run.completed, etc.)
+            if (data.event === 'message.delta' && data.delta) {
+                appendText(data.delta);
+                return;
+            }
+            if (data.event === 'run.completed' && data.output) {
+                appendText(data.output);
+                return;
+            }
         }
 
-        /**
-         * Render tool progress as an inline card.
-         */
+        // ── Tool Progress Rendering ─────────────────────────────────────
+
         _renderToolProgress(bubble, data) {
             const toolName = data.tool || data.name || 'unknown';
-            const toolDetail = data.detail || data.args || data.input || '';
-            const toolId = data.id || toolName;
+            const toolLabel = data.label || data.detail || data.args || data.input || '';
+            const toolEmoji = data.emoji || '🔧';
+            const toolId = data.toolCallId || data.id || toolName;
+            const status = data.status || 'running';
+
+            if (status === 'completed') {
+                this._markToolComplete(bubble, toolId);
+                return;
+            }
 
             let html = `<div class="tool-progress" id="tool-${this._escapeHtml(toolId)}">`;
-            html += `<span class="tool-icon">🔧</span>`;
-            html += `<span class="tool-name">Running: ${this._escapeHtml(toolName)}</span>`;
-            if (toolDetail) {
-                html += `<div class="tool-detail">${this._escapeHtml(
-                    typeof toolDetail === 'string' ? toolDetail : JSON.stringify(toolDetail, null, 2)
-                )}</div>`;
+            html += `<span class="tool-icon">${toolEmoji}</span>`;
+            html += `<span class="tool-name">${this._escapeHtml(toolName)}</span>`;
+            if (toolLabel) {
+                // Truncate very long labels
+                const displayLabel = toolLabel.length > 200
+                    ? toolLabel.substring(0, 200) + '...'
+                    : toolLabel;
+                html += `<div class="tool-detail">${this._escapeHtml(displayLabel)}</div>`;
             }
-            html += `</div>`;
+            html += '</div>';
 
-            // Append before the accumulated text
-            const existing = bubble.querySelector('.tool-progress:last-of-type');
+            // Insert before accumulated text
             const div = document.createElement('div');
             div.innerHTML = html;
             bubble.appendChild(div.firstChild);
@@ -347,13 +457,120 @@
         }
 
         _renderToolComplete(bubble, data) {
-            const toolId = data.id || data.tool || data.name || '';
-            const existing = document.getElementById(`tool-${this._escapeHtml(toolId)}`);
+            const toolId = data.toolCallId || data.id || data.tool || data.name || '';
+            this._markToolComplete(bubble, toolId);
+        }
+
+        _markToolComplete(bubble, toolId) {
+            const existing = bubble.querySelector(`#tool-${CSS.escape(toolId)}`);
             if (existing) {
                 existing.classList.add('completed');
                 const nameEl = existing.querySelector('.tool-name');
-                if (nameEl) nameEl.textContent = nameEl.textContent.replace('Running:', 'Done:');
+                if (nameEl && !nameEl.textContent.includes('✓')) {
+                    nameEl.textContent = '✓ ' + nameEl.textContent;
+                }
             }
+        }
+
+        // ── Approval Dialog ──────────────────────────────────────────────
+
+        _renderApprovalDialog(bubble, data) {
+            const toolName = data.tool || data.name || 'unknown';
+            const command = data.command || data.args || data.detail || '';
+            const approvalId = data.approval_id || data.id || data.toolCallId || '';
+            const reason = data.reason || data.message || '';
+
+            let html = `<div class="approval-dialog" id="approval-${this._escapeHtml(approvalId)}">`;
+            html += '<div class="approval-header">';
+            html += '<span class="approval-icon">⚠️</span>';
+            html += `<span class="approval-title">Approval needed: ${this._escapeHtml(toolName)}</span>`;
+            html += '</div>';
+            if (command) {
+                html += `<div class="approval-command">${this._escapeHtml(command)}</div>`;
+            }
+            if (reason) {
+                html += `<div class="approval-reason">${this._escapeHtml(reason)}</div>`;
+            }
+            html += '<div class="approval-buttons">';
+            html += `<button class="btn btn-primary approval-approve" data-approval-id="${this._escapeHtml(approvalId)}">✓ Approve</button>`;
+            html += `<button class="btn btn-danger approval-deny" data-approval-id="${this._escapeHtml(approvalId)}">✕ Deny</button>`;
+            html += '</div>';
+            html += '</div>';
+
+            const div = document.createElement('div');
+            div.innerHTML = html;
+            const approvalEl = div.firstChild;
+            bubble.appendChild(approvalEl);
+            this._scrollToBottom();
+
+            // Bind approve/deny buttons
+            approvalEl.querySelector('.approval-approve').addEventListener('click', () => {
+                this._sendApproval(approvalId, true);
+            });
+            approvalEl.querySelector('.approval-deny').addEventListener('click', () => {
+                this._sendApproval(approvalId, false);
+            });
+        }
+
+        _renderApprovalResolved(bubble, data) {
+            const approvalId = data.approval_id || data.id || '';
+            const approved = data.approved || data.resolution === 'approved';
+            const el = bubble.querySelector(`#approval-${CSS.escape(approvalId)}`);
+            if (el) {
+                el.classList.add(approved ? 'approved' : 'denied');
+                const buttons = el.querySelector('.approval-buttons');
+                if (buttons) buttons.remove();
+                const header = el.querySelector('.approval-title');
+                if (header) {
+                    header.textContent = approved ? '✓ Approved' : '✕ Denied';
+                }
+            }
+        }
+
+        async _sendApproval(approvalId, approved) {
+            try {
+                const profile = this.app.activeProfile;
+                const port = this.app.sessionManager.activeSessionId;
+                const resp = await fetch(HERMES_BASE + '/api/approval', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        approval_id: approvalId,
+                        approved: approved,
+                        profile: profile,
+                        session_id: this.app.sessionManager.activeSessionId,
+                    }),
+                });
+                if (!resp.ok) {
+                    console.error('Approval send failed:', resp.status);
+                }
+            } catch (e) {
+                console.error('Approval error:', e);
+            }
+        }
+
+        // ── Copy Buttons ─────────────────────────────────────────────────
+
+        _addCopyButtons(bubble) {
+            const codeBlocks = bubble.querySelectorAll('pre');
+            codeBlocks.forEach(pre => {
+                if (pre.querySelector('.copy-btn')) return; // Already has button
+                const btn = document.createElement('button');
+                btn.className = 'copy-btn';
+                btn.textContent = 'Copy';
+                btn.addEventListener('click', () => {
+                    const code = pre.querySelector('code');
+                    const text = code ? code.textContent : pre.textContent;
+                    navigator.clipboard.writeText(text).then(() => {
+                        btn.textContent = '✓ Copied!';
+                        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+                    }).catch(() => {
+                        btn.textContent = '✗ Failed';
+                        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+                    });
+                });
+                pre.appendChild(btn);
+            });
         }
 
         // ── UI Helpers ──────────────────────────────────────────────────
@@ -366,6 +583,9 @@
                 bubble.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
             } else {
                 bubble.innerHTML = renderMarkdown(content);
+                if (role === 'assistant') {
+                    this._addCopyButtons(bubble);
+                }
             }
 
             this._scrollToBottom();
@@ -399,7 +619,7 @@
         _setStreamingUI(streaming) {
             document.getElementById('send-btn').style.display = streaming ? 'none' : 'flex';
             document.getElementById('stop-btn').style.display = streaming ? 'flex' : 'none';
-            document.getElementById('message-input').disabled = false; // Keep enabled for stop+type
+            document.getElementById('message-input').disabled = false;
         }
 
         stop() {

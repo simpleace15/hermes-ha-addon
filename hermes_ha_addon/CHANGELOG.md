@@ -1,3 +1,26 @@
+## 1.1.0 (2026-07-12)
+
+### Added
+- **Tool approval dialog**: when the agent needs approval for a risky tool, shows
+  an inline approve/deny dialog with the command and reason — no more silent auto-run
+- **Tool streaming display**: fixed SSE parsing to handle named `event: hermes.tool.progress`
+  lines — tool progress cards now show emoji, name, label, and completion status correctly
+- **Model selector**: dropdown in header to pick which model to use for chat
+- **Skills browser**: workspace panel now has Files/Skills tabs — browse installed skills
+  and click to invoke them
+- **Session rename**: double-click a session title to rename it inline (PATCH endpoint)
+- **Session export**: download a session as a markdown file
+- **Code copy buttons**: hover over any code block to get a copy button
+- **Syntax highlighting**: lightweight highlighter for Python, JS/TS, Bash, SQL, Go, Rust,
+  YAML, JSON, Dockerfile — no external dependencies (works in HA Ingress)
+- **Keyboard shortcuts**: Ctrl+K focus input, Ctrl+N new session, Ctrl+/ help, Esc close panels
+- **Auto-reconnect**: SSE stream auto-retries on network drop (up to 2 attempts with backoff)
+- **Per-session streaming**: new `/api/sessions/{id}/chat/stream` route for session chat
+
+### Fixed
+- SSE parsing: now correctly handles `event:` named event lines (was only looking at `data:` lines)
+- Tool progress events: event type is in the SSE `event:` field, not the JSON body
+
 ## 1.0.9 (2026-07-12)
 
 ### Added

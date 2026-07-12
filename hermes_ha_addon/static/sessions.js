@@ -21,6 +21,14 @@
                 this.createSession();
             });
 
+            // Export session button
+            const exportBtn = document.getElementById('export-session-btn');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', () => {
+                    this.exportSession();
+                });
+            }
+
             // Session search
             document.getElementById('session-search').addEventListener('input', (e) => {
                 this.searchQuery = e.target.value.toLowerCase();
@@ -240,7 +248,147 @@
                     const sessionId = item.dataset.sessionId;
                     this.loadSession(sessionId);
                 });
+
+                // Double-click on session title to rename inline
+                const titleEl = item.querySelector('.session-title');
+                if (titleEl) {
+                    titleEl.addEventListener('dblclick', (e) => {
+                        e.stopPropagation();
+                        this._startRename(item, titleEl);
+                    });
+                }
             });
+        }
+
+        /**
+         * Begin inline rename of a session title.
+         */
+        _startRename(itemEl, titleEl) {
+            const sessionId = itemEl.dataset.sessionId;
+            const currentTitle = titleEl.textContent;
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'session-rename-input';
+            input.value = currentTitle;
+            titleEl.replaceWith(input);
+            input.focus();
+            input.select();
+
+            let finished = false;
+            const finish = async (save) => {
+                if (finished) return;
+                finished = true;
+                const newTitle = input.value.trim();
+                if (save && newTitle && newTitle !== currentTitle) {
+                    await this._renameSession(sessionId, newTitle);
+                } else {
+                    // Restore title
+                    const span = document.createElement('div');
+                    span.className = 'session-title';
+                    span.textContent = currentTitle;
+                    if (input.parentNode) {
+                        input.replaceWith(span);
+                        // Re-bind dblclick
+                        span.addEventListener('dblclick', (e) => {
+                            e.stopPropagation();
+                            this._startRename(itemEl, span);
+                        });
+                    }
+                }
+            };
+
+            input.addEventListener('blur', () => finish(true));
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    input.blur();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    finished = true;
+                    const span = document.createElement('div');
+                    span.className = 'session-title';
+                    span.textContent = currentTitle;
+                    if (input.parentNode) {
+                        input.replaceWith(span);
+                        span.addEventListener('dblclick', (ev) => {
+                            ev.stopPropagation();
+                            this._startRename(itemEl, span);
+                        });
+                    }
+                }
+            });
+        }
+
+        async _renameSession(sessionId, newTitle) {
+            try {
+                const resp = await fetch(`${HERMES_BASE}/api/sessions/${sessionId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Hermes-Profile': this.app.activeProfile,
+                    },
+                    body: JSON.stringify({ title: newTitle }),
+                });
+                if (!resp.ok) {
+                    console.error('Rename session failed:', resp.status);
+                    this.app.setStatus('Failed to rename session', 'error');
+                    return;
+                }
+                this.app.setStatus('Session renamed', 'ok');
+                this.fetchSessions();
+            } catch (e) {
+                console.error('Rename session error:', e);
+                this.app.setStatus('Failed to rename session', 'error');
+            }
+        }
+
+        /**
+         * Export the active session's messages as a Markdown file.
+         */
+        async exportSession() {
+            if (!this.activeSessionId) {
+                this.app.setStatus('No active session to export', 'error');
+                return;
+            }
+            this.app.setStatus('Exporting session...', 'connecting');
+            try {
+                const resp = await fetch(
+                    `${HERMES_BASE}/api/sessions/${this.activeSessionId}/messages?profile=${this.app.activeProfile}`
+                );
+                if (!resp.ok) {
+                    console.error('Export: failed to fetch messages:', resp.status);
+                    this.app.setStatus('Failed to export session', 'error');
+                    return;
+                }
+                const result = await resp.json();
+                const msgs = Array.isArray(result) ? result : (result.data || result.messages || []);
+
+                let md = `# Session Export: ${this.activeSessionId}\n\n`;
+                msgs.forEach(msg => {
+                    const role = msg.role || 'assistant';
+                    if (role === 'tool' || role === 'function') return;
+                    let content = msg.content || '';
+                    if (Array.isArray(content)) {
+                        content = content.map(c => typeof c === 'string' ? c : (c.text || JSON.stringify(c))).join('');
+                    }
+                    md += `## ${role}\n\n${content}\n\n---\n\n`;
+                });
+
+                const blob = new Blob([md], { type: 'text/markdown' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `session_${this.activeSessionId}.md`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                this.app.setStatus('Session exported', 'ok');
+            } catch (e) {
+                console.error('Export session error:', e);
+                this.app.setStatus('Failed to export session', 'error');
+            }
         }
 
         _formatTime(ts) {

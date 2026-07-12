@@ -56,6 +56,9 @@
                 <select id="profile-selector" class="profile-selector">
                     <option value="">Loading profiles...</option>
                 </select>
+                <select id="model-selector" class="profile-selector" title="Select model">
+                    <option value="">Auto</option>
+                </select>
                 <span id="model-name" class="model-name"></span>
             </div>
             <div class="header-right">
@@ -89,6 +92,7 @@
                         </svg>
                         New Session
                     </button>
+                    <button id="export-session-btn" class="btn btn-block" style="margin-top:4px;font-size:12px;">Export Session</button>
                 </div>
                 <div id="session-list" class="session-list">
                     <!-- Sessions populated by JS -->
@@ -131,6 +135,10 @@
                             <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
                     </button>
+                </div>
+                <div class="workspace-tabs">
+                    <button class="workspace-tab active" data-tab="files">Files</button>
+                    <button class="workspace-tab" data-tab="skills">Skills</button>
                 </div>
                 <div id="workspace-content" class="workspace-content">
                     <div class="workspace-placeholder">

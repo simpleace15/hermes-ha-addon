@@ -767,3 +767,156 @@ body {
     border: 1px solid var(--border);
 }
 .workspace-refresh:hover { background: var(--bg); color: var(--text); }
+
+/* ── Syntax Highlighting ────────────────────────────────────────────── */
+.hl-keyword { color: var(--primary); font-weight: 600; }
+.hl-string { color: var(--success); }
+.hl-comment { color: var(--text-faint); font-style: italic; }
+.hl-number { color: var(--warning); }
+
+/* ── Model Selector ──────────────────────────────────────────────────── */
+.model-selector {
+    background: var(--bg-input);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 4px 8px;
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+    max-width: 180px;
+}
+.model-selector:focus { border-color: var(--primary); }
+
+/* ── Workspace Tabs ──────────────────────────────────────────────────── */
+.workspace-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.workspace-tab {
+    flex: 1;
+    padding: 8px 12px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: color var(--transition), border-color var(--transition);
+}
+.workspace-tab:hover { color: var(--text); }
+.workspace-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+/* ── Skill Cards ─────────────────────────────────────────────────────── */
+.skill-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 0;
+}
+.skill-card {
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background var(--transition), border-color var(--transition);
+}
+.skill-card:hover {
+    background: var(--bg-hover);
+    border-color: var(--primary);
+}
+.skill-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+}
+.skill-category {
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--primary);
+    margin-top: 2px;
+}
+.skill-description {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+/* ── Approval Dialog ─────────────────────────────────────────────────── */
+.approval-dialog {
+    margin: 8px 0;
+    padding: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--warning);
+    border-left: 3px solid var(--warning);
+    border-radius: var(--radius);
+}
+.approval-dialog.approved { border-color: var(--success); border-left-color: var(--success); }
+.approval-dialog.denied { border-color: var(--danger); border-left-color: var(--danger); }
+.approval-header { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.approval-title { font-weight: 600; color: var(--warning); }
+.approval-command { font-family: var(--font-mono); font-size: 12px; background: var(--code-bg); padding: 8px; border-radius: 4px; margin: 6px 0; white-space: pre-wrap; }
+.approval-reason { font-size: 12px; color: var(--text-dim); margin: 4px 0; }
+.approval-buttons { display: flex; gap: 8px; margin-top: 10px; }
+
+/* ── Copy Button (in <pre> blocks) ───────────────────────────────────── */
+.copy-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: var(--bg-hover);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+pre:hover .copy-btn { opacity: 1; }
+pre { position: relative; }
+
+/* ── Reconnect Banner ────────────────────────────────────────────────── */
+.reconnect-banner {
+    background: var(--warning);
+    color: #000;
+    padding: 8px 16px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+.reconnect-banner .reconnect-action {
+    background: #000;
+    color: var(--warning);
+    border: none;
+    border-radius: var(--radius);
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 600;
+}
+.reconnect-banner .reconnect-action:hover { opacity: 0.8; }
+
+/* ── Session Rename Input ────────────────────────────────────────────── */
+.session-rename-input {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--primary);
+    border-radius: 3px;
+    padding: 2px 6px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: var(--font-sans);
+    outline: none;
+}
