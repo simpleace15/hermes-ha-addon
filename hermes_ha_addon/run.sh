@@ -14,6 +14,7 @@ if [ -f "$OPTIONS_FILE" ]; then
     DEFAULT_PROFILE="$(jq -r '.default_profile // "default"' "$OPTIONS_FILE")"
     MANUAL_PROFILES="$(jq -c '.manual_profiles // []' "$OPTIONS_FILE")"
     LOG_LEVEL="$(jq -r '.log_level // "info"' "$OPTIONS_FILE")"
+    THEME="$(jq -r '.theme // "ha-dark"' "$OPTIONS_FILE")"
 else
     echo "WARNING: $OPTIONS_FILE not found, using env vars or defaults"
     HERMES_HOST="${HERMES_HOST:-}"
@@ -22,6 +23,7 @@ else
     DEFAULT_PROFILE="${DEFAULT_PROFILE:-default}"
     MANUAL_PROFILES="${MANUAL_PROFILES:-[]}"
     LOG_LEVEL="${LOG_LEVEL:-info}"
+    THEME="${THEME:-ha-dark}"
 fi
 
 export HERMES_HOST
@@ -30,12 +32,14 @@ export REGISTRY_PORT
 export DEFAULT_PROFILE
 export MANUAL_PROFILES
 export LOG_LEVEL
+export THEME
 
 echo "Starting Hermes Agent Chat add-on..."
 echo "  Hermes host: ${HERMES_HOST:-not configured}"
 echo "  Registry port: ${REGISTRY_PORT}"
 echo "  Default profile: ${DEFAULT_PROFILE}"
 echo "  Log level: ${LOG_LEVEL}"
+echo "  Theme: ${THEME}"
 
 cd /app
 exec python3 app.py

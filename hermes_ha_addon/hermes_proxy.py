@@ -228,6 +228,34 @@ class HermesProxy:
 
         return resp
 
+    # ── Chat (Non-Streaming — for workspace queries) ────────────────────
+
+    def chat_sync(self, port, messages, model=None, session_id=None):
+        """
+        Send a chat request and return the full response (no streaming).
+        Used for workspace file listing/reading where we need the complete
+        response before processing.
+        """
+        url = self.profile_url(port, "v1/chat/completions")
+        body = {
+            "model": model or "hermes-agent",
+            "messages": messages,
+            "stream": False,
+        }
+        if session_id:
+            body["session_id"] = session_id
+
+        log.debug("chat_sync to %s (model=%s, msgs=%d)", url, body["model"], len(messages))
+        resp = requests.post(
+            url,
+            headers=self.auth_headers,
+            json=body,
+            timeout=60,  # longer timeout for tool execution
+        )
+        if not resp.ok:
+            raise HermesAPIError(resp.status_code, resp.text)
+        return resp
+
     # ── Capabilities / Models / Skills / Toolsets ─────────────────────
 
     def get_capabilities(self, port):

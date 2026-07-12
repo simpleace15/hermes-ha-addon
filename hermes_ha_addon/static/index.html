@@ -24,6 +24,12 @@
             window.HERMES_BASE = prefix;
             console.log('Hermes Ingress prefix:', window.HERMES_BASE);
         })();
+
+        // Apply saved theme immediately to prevent flash of wrong theme
+        (function() {
+            var saved = localStorage.getItem('hermes_theme') || 'ha-dark';
+            document.documentElement.setAttribute('data-theme', saved);
+        })();
     </script>
 </head>
 <body>
@@ -53,6 +59,13 @@
                 <span id="model-name" class="model-name"></span>
             </div>
             <div class="header-right">
+                <span id="theme-icon" class="theme-icon" title="Current theme">🎨</span>
+                <select id="theme-selector" class="theme-selector" title="Select theme">
+                    <option value="ha-dark">🌙 HA Dark</option>
+                    <option value="ha-light">☀️ HA Light</option>
+                    <option value="midnight">🌌 Midnight</option>
+                    <option value="solarized">🌴 Solarized</option>
+                </select>
                 <button id="workspace-toggle" class="icon-btn" title="Toggle workspace">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M3 7h18M3 12h18M3 17h18"></path>
@@ -138,6 +151,7 @@
     </div>
 
     <!-- Scripts (order matters — dependencies first) -->
+    <script src="themes.js"></script>
     <script src="markdown.js"></script>
     <script src="commands.js"></script>
     <script src="sessions.js"></script>

@@ -24,6 +24,7 @@ HERMES_API_KEY = os.environ.get("HERMES_API_KEY", "")
 REGISTRY_PORT = os.environ.get("REGISTRY_PORT", "8641")
 DEFAULT_PROFILE = os.environ.get("DEFAULT_PROFILE", "default")
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "info").upper()
+THEME = os.environ.get("THEME", "ha-dark")
 
 # Manual profiles come as JSON string from HA options
 _manual_raw = os.environ.get("MANUAL_PROFILES", "[]")
@@ -310,6 +311,101 @@ def toolsets():
                         content_type=resp.headers.get("Content-Type", "application/json"))
     except Exception as e:
         return jsonify({"error": str(e)}), 502
+
+
+# ── Routes: Workspace ──────────────────────────────────────────────────
+
+@app.route("/api/workspace/list", methods=["POST"])
+def workspace_list():
+    """
+    Ask the agent to list files in a directory.
+    Uses a non-streaming chat call — the agent executes file tools
+    server-side and returns the listing in the response.
+    """
+    data = request.get_json(silent=True) or {}
+    path = data.get("path", ".")
+    profile = data.get("profile", DEFAULT_PROFILE)
+    port = resolve_port(profile)
+    log.info("workspace_list: profile=%s port=%s path=%s", profile, port, path)
+
+    prompt = (
+        f"List the files and directories at '{path}'. "
+        "Use the search_files tool with target='files' to find files. "
+        "Return ONLY the file listing as a simple list, one entry per line. "
+        "Prefix directories with [DIR] and files with [FILE]. "
+        "Do not include any other commentary."
+    )
+
+    try:
+        resp = proxy.chat_sync(
+            port,
+            messages=[{"role": "user", "content": prompt}],
+            model=profile,
+        )
+        result = resp.json()
+        # Extract the assistant's text from the chat completion response
+        content = ""
+        if "choices" in result and result["choices"]:
+            msg = result["choices"][0].get("message", {})
+            content = msg.get("content", "")
+        return jsonify({"files": content, "path": path})
+    except HermesAPIError as e:
+        log.error("workspace_list error: %s", e)
+        return jsonify({"error": e.body}), e.status_code
+    except Exception as e:
+        log.error("workspace_list failed: %s", e)
+        log.debug("  traceback: %s", traceback.format_exc())
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/workspace/read", methods=["POST"])
+def workspace_read():
+    """
+    Ask the agent to read a file and return its contents.
+    Uses a non-streaming chat call with the read_file tool.
+    """
+    data = request.get_json(silent=True) or {}
+    path = data.get("path", "")
+    profile = data.get("profile", DEFAULT_PROFILE)
+    port = resolve_port(profile)
+    log.info("workspace_read: profile=%s port=%s path=%s", profile, port, path)
+
+    if not path:
+        return jsonify({"error": "path is required"}), 400
+
+    prompt = (
+        f"Read the file at '{path}' using the read_file tool. "
+        "Return the complete file contents with line numbers. "
+        "Do not include any commentary, just the file contents."
+    )
+
+    try:
+        resp = proxy.chat_sync(
+            port,
+            messages=[{"role": "user", "content": prompt}],
+            model=profile,
+        )
+        result = resp.json()
+        content = ""
+        if "choices" in result and result["choices"]:
+            msg = result["choices"][0].get("message", {})
+            content = msg.get("content", "")
+        return jsonify({"content": content, "path": path})
+    except HermesAPIError as e:
+        log.error("workspace_read error: %s", e)
+        return jsonify({"error": e.body}), e.status_code
+    except Exception as e:
+        log.error("workspace_read failed: %s", e)
+        log.debug("  traceback: %s", traceback.format_exc())
+        return jsonify({"error": str(e)}), 502
+
+
+# ── Routes: Theme Config ──────────────────────────────────────────────
+
+@app.route("/api/theme")
+def get_theme():
+    """Return the configured theme from HA options."""
+    return jsonify({"theme": THEME})
 
 
 # ── Catch-all for static files (Ingress-compatible) ───────────────────

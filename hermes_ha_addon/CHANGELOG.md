@@ -1,3 +1,18 @@
+## 1.0.9 (2026-07-12)
+
+### Added
+- **Workspace file browser**: click the workspace icon to browse files on the active
+  Hermes profile — lists directories, reads files, navigates with back/refresh buttons.
+  Uses the agent's file tools (search_files, read_file) via non-streaming chat calls.
+- **Theme system**: 4 built-in themes selectable from the header dropdown —
+  HA Dark, HA Light, Midnight Purple, Solarized. Choice is saved in localStorage
+  and can be overridden by the `theme` option in HA add-on config.
+
+### Changed
+- CSS variables now use `[data-theme]` attribute selectors instead of `@media prefers-color-scheme`
+- Theme applied immediately on page load (no flash of wrong theme)
+- `themes.js` loaded before other scripts
+
 ## 1.0.8 (2026-07-12)
 
 ### Fixed
