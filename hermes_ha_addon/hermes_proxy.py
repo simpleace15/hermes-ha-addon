@@ -242,28 +242,6 @@ class HermesProxy:
     def get_toolsets(self, port):
         return self._proxy_get(port, "v1/toolsets")
 
-    # ── Session Chat (alternative endpoint) ───────────────────────────
-
-    def session_chat_stream(self, port, session_id, message):
-        """
-        Use the per-session streaming endpoint.
-        POST /api/sessions/{id}/chat/stream
-        """
-        url = self.profile_url(port, f"api/sessions/{session_id}/chat/stream")
-        resp = requests.post(
-            url,
-            headers=self.auth_headers,
-            json={"message": message},
-            stream=True,
-            timeout=(STREAM_CONNECT_TIMEOUT, None),
-        )
-        if not resp.ok:
-            error_body = resp.text
-            resp.close()
-            raise HermesAPIError(resp.status_code, error_body)
-        return resp
-
-
 class HermesAPIError(Exception):
     """Raised when the Hermes API returns a non-2xx status."""
 

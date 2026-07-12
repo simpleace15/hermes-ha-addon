@@ -1,3 +1,14 @@
+## 1.0.7 (2026-07-12)
+
+### Changed
+- Pin HA base image to `2026.06.1` instead of `:latest` for reproducible builds
+- Add `stage: "experimental"` to config.yaml
+- Add `.dockerignore` to exclude dev files, `__pycache__`, and `.venv` from build context
+
+### Removed
+- `mock_hermes_server.py` — dev/test file, not needed in production add-on
+- `session_chat_stream()` — dead code in `hermes_proxy.py`, never called by any route
+
 ## 1.0.6 (2026-07-11)
 
 ### Fixed

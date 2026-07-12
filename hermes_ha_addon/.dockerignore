@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+mock_hermes_server.py
+*.md
+!CHANGELOG.md
+.git/
+.gitignore

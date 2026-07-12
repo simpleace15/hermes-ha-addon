@@ -1,4 +1,4 @@
-ARG BUILD_FROM=ghcr.io/home-assistant/base:latest
+ARG BUILD_FROM=ghcr.io/home-assistant/base:2026.06.1
 FROM ${BUILD_FROM}
 
 # Install Python and dependencies
@@ -20,7 +20,7 @@ RUN chmod a+x /run.sh
 WORKDIR /app
 
 LABEL \
-    io.hass.version="1.0.6" \
+    io.hass.version="1.0.7" \
     io.hass.type="app" \
     io.hass.arch="amd64,aarch64,armv7"
 
