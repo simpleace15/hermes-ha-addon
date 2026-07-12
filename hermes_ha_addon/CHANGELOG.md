@@ -1,3 +1,8 @@
+## 1.0.8 (2026-07-12)
+
+### Fixed
+- HA base image tag: `2026.06.1` (git tag) → `3.24` (actual ghcr.io container tag) — build was failing because the image tag didn't exist on the container registry
+
 ## 1.0.7 (2026-07-12)
 
 ### Changed

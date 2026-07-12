@@ -20,7 +20,7 @@ RUN chmod a+x /run.sh
 WORKDIR /app
 
 LABEL \
-    io.hass.version="1.0.7" \
+    io.hass.version="1.0.8" \
     io.hass.type="app" \
     io.hass.arch="amd64,aarch64,armv7"
 
