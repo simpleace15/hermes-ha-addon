@@ -1,3 +1,16 @@
+## 1.0.6 (2026-07-11)
+
+### Fixed
+- Session list: parse Hermes API response format `{object: "list", data: [...]}` correctly
+- Session messages: same fix — was looking for `messages.messages` instead of `data.data`
+- Timestamps: Hermes uses Unix timestamps (float), not ISO strings — multiply by 1000 for JS Date
+- Session render: use `last_active` field (what Hermes actually returns) instead of `updated_at`
+- Tool messages in history are now skipped in display (they're JSON, not chat messages)
+
+### Added
+- Session resume: loading a session now populates the chat messages array so you can continue
+  the conversation — new messages are sent with the session_id to maintain continuity
+
 ## 1.0.5 (2026-07-11)
 
 ### Fixed
