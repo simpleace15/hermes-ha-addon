@@ -1,7 +1,7 @@
 ## 1.0.7 (2026-07-12)
 
 ### Changed
-- Pin HA base image to `2026.06.1` instead of `:latest` for reproducible builds
+- Pin HA base image to `3.24` instead of `:latest` for reproducible builds
 - Add `stage: "experimental"` to config.yaml
 - Add `.dockerignore` to exclude dev files, `__pycache__`, and `.venv` from build context
 
