@@ -188,12 +188,16 @@
         }
 
         switchProfile(profileName) {
-            if (profileName === this.activeProfile) return;
+            if (!profileName || profileName === this.activeProfile) return;
 
+            const oldProfile = this.activeProfile;
             this.activeProfile = profileName;
             localStorage.setItem('hermes_active_profile', profileName);
 
-            // Update model
+            // Update the selector immediately
+            document.getElementById('profile-selector').value = profileName;
+
+            // Update model from discovered profiles
             const profile = this.profiles.find(p => p.name === profileName);
             this.activeModel = profile ? profile.model : null;
             this._updateModelDisplay();
@@ -201,15 +205,22 @@
             // Clear state
             this.chatManager.clear();
             this.sessionManager.clear();
+            this.sessionManager.activeSessionId = null;
 
-            // Reload sessions
+            // Show loading state
+            this.setStatus(`Loading ${profileName}...`, 'connecting');
+
+            // Reload sessions for the new profile
             this.sessionManager.fetchSessions();
 
             // Reload models for the new profile
             this.loadModels();
 
-            this.setStatus(`Switched to ${profileName}`, 'ok');
+            // Check connection health
             this._checkConnection();
+
+            this.setStatus(`Switched to ${profileName}`, 'ok');
+            console.log('[hermes] Switched profile:', oldProfile, '→', profileName);
         }
 
         _updateModelDisplay() {

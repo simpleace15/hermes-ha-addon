@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="hermes_ha_addon/static/logo.svg" width="128" height="128" alt="Hermes Agent Chat Logo"/>
+
 # 🤖 Hermes Agent Chat
 
 ### A full-featured Home Assistant add-on for chatting with your remote Hermes Agent

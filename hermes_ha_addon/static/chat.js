@@ -781,7 +781,7 @@
             if ('Notification' in window && Notification.permission === 'granted') {
                 new Notification('Hermes Agent', {
                     body: preview || 'Response complete',
-                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%2303a9f4" stroke-width="2"><path d="M12 2a3 3 0 0 1 3 3c0 1.5-1 2-1 3v1h2a4 4 0 0 1 4 4v2H4v-2a4 4 0 0 1 4-4h2V8c0-1-1-1.5-1-3a3 3 0 0 1 3-3z"/></svg>',
+                    icon: HERMES_BASE + '/icon.svg',
                 });
             }
             // Also flash the favicon/title as fallback

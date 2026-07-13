@@ -1,3 +1,13 @@
+## 1.3.1 (2026-07-12)
+
+### Fixed
+- **Theme switching not working** — server config theme was overriding user's localStorage choice on every page load via async fetch race condition. Now: localStorage (user choice) always takes priority, server config only sets initial default for new users
+- **Profile switching** — added immediate selector update, loading status, activeSessionId reset, and debug logging
+
+### Added
+- **Logo** — SVG robot + chat bubble logo for README, app header, and favicon
+- **App icon** — simplified SVG icon for HA sidebar and browser notifications
+
 ## 1.3.0 (2026-07-12)
 
 ### New Features (10 features from audit)

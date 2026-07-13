@@ -51,25 +51,27 @@
     }
 
     function initTheme() {
-        // Check if backend has a configured theme (from HA options)
-        // Falls back to localStorage if no server config or fetch fails
-        let applied = false;
-
-        fetch(HERMES_BASE + '/api/theme')
-            .then(resp => resp.json())
-            .then(data => {
-                if (data.theme && data.theme !== 'ha-dark') {
-                    // Server has a non-default theme — use it
-                    applyTheme(data.theme);
-                    applied = true;
-                }
-            })
-            .catch(() => { /* ignore — use localStorage */ })
-            .finally(() => {
-                if (!applied) {
+        // Priority: localStorage (user choice) > server config > auto-detect
+        const saved = localStorage.getItem('hermes_theme');
+        
+        if (saved) {
+            // User has explicitly chosen a theme — always respect it
+            applyTheme(saved);
+        } else {
+            // No saved preference — check server config, then auto-detect
+            fetch(HERMES_BASE + '/api/theme')
+                .then(resp => resp.json())
+                .then(data => {
+                    if (data.theme) {
+                        applyTheme(data.theme);
+                    } else {
+                        applyTheme(getStoredTheme());
+                    }
+                })
+                .catch(() => {
                     applyTheme(getStoredTheme());
-                }
-            });
+                });
+        }
 
         // Bind selector change
         const selector = document.getElementById('theme-selector');
