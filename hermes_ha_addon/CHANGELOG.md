@@ -1,3 +1,13 @@
+## 1.1.1 (2026-07-12)
+
+### Added
+- **Token usage metadata**: each assistant response now shows a metadata bar with:
+  - 🤖 Model name
+  - 📊 Token counts (prompt↑, completion↓, total)
+  - ⏱ Response time in seconds
+- Added `stream_options: {include_usage: true}` to chat requests so the Hermes API
+  includes token counts in the final SSE chunk
+
 ## 1.1.0 (2026-07-12)
 
 ### Added

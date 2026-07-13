@@ -168,6 +168,9 @@
             this.abortController = new AbortController();
             let accumulatedText = '';
             let firstToken = true;
+            const startTime = Date.now();
+            this._capturedUsage = null;
+            this._capturedModel = '';
 
             try {
                 const resp = await fetch(HERMES_BASE + '/api/chat', {
@@ -178,6 +181,7 @@
                         model: this.app.activeModel || this.app.activeProfile,
                         profile: this.app.activeProfile,
                         session_id: this.app.sessionManager.activeSessionId,
+                        stream_options: { include_usage: true },
                     }),
                     signal: this.abortController.signal,
                 });
@@ -201,6 +205,9 @@
                 const result = await this._processSSEStream(resp.body, bubble, accumulatedText, firstToken);
                 accumulatedText = result.accumulatedText;
                 firstToken = result.firstToken;
+                const usage = result.usage;
+                const responseModel = result.model;
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
                 // Finalize
                 if (accumulatedText) {
@@ -208,6 +215,11 @@
                     this._addCopyButtons(bubble);
                 } else if (firstToken) {
                     bubble.innerHTML = '<span class="text-faint">(empty response)</span>';
+                }
+
+                // Add token/usage metadata bar
+                if (usage || elapsed > 0) {
+                    this._addUsageMetadata(msgEl, usage, responseModel, elapsed);
                 }
 
                 // Store assistant response
@@ -257,6 +269,8 @@
             const decoder = new TextDecoder();
             let buffer = '';
             let currentEventType = '';  // Track named event type
+            let usage = null;  // Token usage from final chunk
+            let responseModel = '';  // Model name from response
 
             const appendText = (text) => {
                 if (firstToken) {
@@ -336,7 +350,7 @@
                 }
             }
 
-            return { accumulatedText, firstToken };
+            return { accumulatedText, firstToken, usage: this._capturedUsage || null, model: this._capturedModel || '' };
         }
 
         /**
@@ -379,6 +393,14 @@
          * Handle a data-only SSE event (no event: line).
          */
         _handleDataEvent(data, bubble, appendText) {
+            // Capture usage from final chunk (has usage, empty delta)
+            if (data.usage) {
+                this._capturedUsage = data.usage;
+            }
+            if (data.model) {
+                this._capturedModel = data.model;
+            }
+
             // Standard OpenAI chat.completion.chunk
             if (data.choices && data.choices[0]) {
                 const delta = data.choices[0].delta;
@@ -419,6 +441,9 @@
             }
             if (data.event === 'run.completed' && data.output) {
                 appendText(data.output);
+                if (data.usage) {
+                    this._capturedUsage = data.usage;
+                }
                 return;
             }
         }
@@ -571,6 +596,40 @@
                 });
                 pre.appendChild(btn);
             });
+        }
+
+        // ── Usage Metadata ───────────────────────────────────────────────
+
+        _addUsageMetadata(msgEl, usage, model, elapsed) {
+            // Remove any existing metadata bar
+            const existing = msgEl.querySelector('.message-meta');
+            if (existing) existing.remove();
+
+            const meta = document.createElement('div');
+            meta.className = 'message-meta';
+
+            const parts = [];
+
+            // Model name
+            if (model) {
+                parts.push(`<span class="meta-item meta-model">🤖 ${this._escapeHtml(model)}</span>`);
+            }
+
+            // Token counts
+            if (usage) {
+                const prompt = usage.prompt_tokens || usage.input_tokens || 0;
+                const completion = usage.completion_tokens || usage.output_tokens || 0;
+                const total = usage.total_tokens || (prompt + completion);
+                parts.push(`<span class="meta-item meta-tokens">📊 ${prompt}↑ ${completion}↓ ${total} total</span>`);
+            }
+
+            // Response time
+            if (elapsed && elapsed > 0) {
+                parts.push(`<span class="meta-item meta-time">⏱ ${elapsed}s</span>`);
+            }
+
+            meta.innerHTML = parts.join('');
+            msgEl.appendChild(meta);
         }
 
         // ── UI Helpers ──────────────────────────────────────────────────

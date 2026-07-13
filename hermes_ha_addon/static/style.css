@@ -774,6 +774,30 @@ body {
 .hl-comment { color: var(--text-faint); font-style: italic; }
 .hl-number { color: var(--warning); }
 
+/* ── Message Usage Metadata ─────────────────────────────────────────── */
+.message-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 var(--radius) var(--radius);
+}
+.message.user .message-meta {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.1);
+}
+.meta-item {
+    white-space: nowrap;
+}
+.meta-model { color: var(--primary); }
+.meta-tokens { color: var(--text-dim); }
+.meta-time { color: var(--text-faint); }
+
 /* ── Model Selector ──────────────────────────────────────────────────── */
 .model-selector {
     background: var(--bg-input);
