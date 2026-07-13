@@ -457,6 +457,28 @@ def approval():
 
 # ── Routes: Capabilities / Models / Skills / Toolsets ────────────────
 
+@app.route("/api/health")
+def health_proxy():
+    """Proxy health check to the active profile's Hermes instance."""
+    profile = get_profile_from_request()
+    port = resolve_port(profile)
+    import time
+    t0 = time.time()
+    try:
+        resp = requests.get(
+            proxy.profile_url(port, "health/detailed"),
+            headers=proxy.auth_headers,
+            timeout=5,
+        )
+        elapsed_ms = int((time.time() - t0) * 1000)
+        data = resp.json() if resp.ok else {"status": "error", "detail": resp.text[:200]}
+        data["response_ms"] = elapsed_ms
+        return jsonify(data), resp.status_code if resp.ok else 502
+    except requests.RequestException as e:
+        elapsed_ms = int((time.time() - t0) * 1000)
+        return jsonify({"status": "offline", "error": str(e), "response_ms": elapsed_ms}), 502
+
+
 @app.route("/api/capabilities")
 def capabilities():
     profile = get_profile_from_request()
@@ -502,6 +524,24 @@ def toolsets():
         return Response(resp.content, status=resp.status_code,
                         content_type=resp.headers.get("Content-Type", "application/json"))
     except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/toolsets/<toolset_name>", methods=["PATCH"])
+def update_toolset(toolset_name):
+    """Toggle a toolset on/off."""
+    profile = get_profile_from_request()
+    port = resolve_port(profile)
+    data = request.get_json(silent=True) or {}
+    enabled = data.get("enabled", False)
+    log.info("Toolset toggle: profile=%s port=%s toolset=%s enabled=%s", profile, port, toolset_name, enabled)
+    try:
+        url = proxy.profile_url(port, f"v1/toolsets/{toolset_name}")
+        resp = requests.patch(url, headers=proxy.auth_headers, json={"enabled": enabled}, timeout=DEFAULT_TIMEOUT)
+        return Response(resp.content, status=resp.status_code,
+                        content_type=resp.headers.get("Content-Type", "application/json"))
+    except Exception as e:
+        log.error("Toolset toggle failed: %s", e)
         return jsonify({"error": str(e)}), 502
 
 

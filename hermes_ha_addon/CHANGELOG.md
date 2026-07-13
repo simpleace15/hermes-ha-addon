@@ -1,3 +1,23 @@
+## 1.3.0 (2026-07-12)
+
+### New Features (10 features from audit)
+- **Session stats in sidebar**: tool call count, total token usage, estimated cost, and model badges per session
+- **Health indicator**: status bar shows Hermes response latency (ms), version, active agent count, and connected platforms via `/health/detailed`
+- **Browser notifications**: desktop notification + title bar flash when response completes and tab isn't focused
+- **Auto-theme detection**: respects system `prefers-color-scheme` for initial theme (no more forcing dark on light-mode users)
+- **Session JSON export**: full session metadata + all messages (including tool calls) as downloadable JSON file
+- **Connection retry countdown**: shows "Reconnecting in Ns..." with countdown timer instead of ambiguous spinner
+- **Tool call history in loaded sessions**: tool messages now show as collapsed cards instead of being hidden
+- **Image upload**: paste or drag-drop images into chat input, sends as OpenAI vision format (base64 `image_url`), with preview thumbnails and remove button
+- **Toolset browser**: new "Tools" tab in workspace panel — shows all toolsets with enable/disable toggle switches, tool tags, and configuration status
+- **Markdown input preview**: eye icon toggles between raw text input and rendered markdown preview
+
+### Data Fields Now Used (4 new)
+- `tool_call_count` → 🔧 badge in sidebar
+- `input_tokens` / `output_tokens` → 📊 total tokens badge in sidebar
+- `estimated_cost_usd` → cost badge in sidebar
+- `model` → model name badge in sidebar
+
 ## 1.2.0 (2026-07-12)
 
 ### Bug Fixes

@@ -28,6 +28,11 @@
             this.chatManager = new ChatManager(this);
             this.workspace = new WorkspaceBrowser(this);
 
+            // Request notification permission for background alerts
+            if (this.chatManager.requestNotificationPermission) {
+                this.chatManager.requestNotificationPermission();
+            }
+
             // Bind UI events
             this._bindEvents();
 
@@ -256,17 +261,48 @@
             this.setConnectionStatus('connecting');
             try {
                 const resp = await HermesUtils.fetchWithTimeout(
-                    `${HERMES_BASE}/api/capabilities?profile=${this.activeProfile}`,
-                    { timeoutMs: 10000 }
+                    `${HERMES_BASE}/api/health?profile=${this.activeProfile}`,
+                    { timeoutMs: 8000 }
                 );
                 if (resp.ok) {
+                    const data = await resp.json();
                     this.setConnectionStatus('online');
+                    this._updateHealthInfo(data);
                 } else {
                     this.setConnectionStatus('offline');
+                    this._updateHealthInfo(null);
                 }
             } catch {
                 this.setConnectionStatus('offline');
+                this._updateHealthInfo(null);
             }
+        }
+
+        _updateHealthInfo(data) {
+            const el = document.getElementById('health-info');
+            if (!el) return;
+            if (!data) {
+                el.innerHTML = '';
+                el.style.display = 'none';
+                return;
+            }
+            el.style.display = 'flex';
+            const ms = data.response_ms || 0;
+            const version = data.version || '';
+            const status = data.status || 'unknown';
+            const agents = data.active_agents != null ? data.active_agents : '?';
+            const platforms = data.platforms || {};
+            const connectedPlatforms = Object.entries(platforms)
+                .filter(([_, p]) => p.state === 'connected')
+                .map(([name]) => name);
+            const latencyColor = ms < 100 ? 'var(--success)' : ms < 500 ? 'var(--warning)' : 'var(--danger)';
+            let html = `<span style="color:${latencyColor}">${ms}ms</span>`;
+            if (version) html += `<span class="health-version">v${version}</span>`;
+            html += `<span class="health-agents">🤖 ${agents} active</span>`;
+            if (connectedPlatforms.length > 0) {
+                html += `<span class="health-platforms">${connectedPlatforms.join(', ')}</span>`;
+            }
+            el.innerHTML = html;
         }
 
         // ── Public API for commands.js ──────────────────────────────────

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hermes Agent Chat</title>
-    <link rel="stylesheet" href="style.css?v=115">
+    <link rel="stylesheet" href="style.css?v=116">
     <script>
         // Detect HA Ingress path prefix from current URL
         // HA Ingress serves under /api/hassio_ingress/<token>/
@@ -27,7 +27,12 @@
 
         // Apply saved theme immediately to prevent flash of wrong theme
         (function() {
-            var saved = localStorage.getItem('hermes_theme') || 'ha-dark';
+            var saved = localStorage.getItem('hermes_theme');
+            if (!saved) {
+                // No saved preference — detect from system
+                var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                saved = prefersDark ? 'ha-dark' : 'ha-light';
+            }
             document.documentElement.setAttribute('data-theme', saved);
         })();
     </script>
@@ -92,7 +97,8 @@
                         </svg>
                         New Session
                     </button>
-                    <button id="export-session-btn" class="btn btn-block" style="margin-top:4px;font-size:12px;">Export Session</button>
+                    <button id="export-session-btn" class="btn btn-block" style="margin-top:4px;font-size:12px;">Export Session (MD)</button>
+                    <button id="export-json-btn" class="btn btn-block" style="margin-top:4px;font-size:12px;">Export Session (JSON)</button>
                 </div>
                 <div id="session-list" class="session-list">
                     <!-- Sessions populated by JS -->
@@ -105,11 +111,18 @@
                     <!-- Messages populated by JS -->
                 </div>
                 <div class="chat-input-area">
+                    <div id="image-preview" class="image-preview" style="display:none;"></div>
                     <div id="command-dropdown" class="command-dropdown" style="display:none;"></div>
                     <div class="input-row">
                         <textarea id="message-input" class="message-input"
                             placeholder="Type a message... (or / for commands)"
                             rows="1"></textarea>
+                        <button id="preview-btn" class="icon-btn" title="Toggle markdown preview" style="flex-shrink:0;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
                         <button id="send-btn" class="btn btn-primary btn-send" title="Send (Enter)">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -139,6 +152,7 @@
                 <div class="workspace-tabs">
                     <button class="workspace-tab active" data-tab="files">Files</button>
                     <button class="workspace-tab" data-tab="skills">Skills</button>
+                    <button class="workspace-tab" data-tab="toolsets">Tools</button>
                 </div>
                 <div id="workspace-content" class="workspace-content">
                     <div class="workspace-placeholder">
@@ -151,6 +165,7 @@
         <!-- Status bar -->
         <footer class="status-bar">
             <span id="status-text" class="status-text">Ready</span>
+            <span id="health-info" class="health-info" style="display:none;"></span>
             <span id="connection-status" class="connection-status">
                 <span class="dot dot-offline"></span>
                 <span id="connection-label">Disconnected</span>
@@ -159,13 +174,13 @@
     </div>
 
     <!-- Scripts (order matters — dependencies first) -->
-    <script src="utils.js?v=115"></script>
-    <script src="themes.js?v=115"></script>
-    <script src="markdown.js?v=115"></script>
-    <script src="commands.js?v=115"></script>
-    <script src="sessions.js?v=115"></script>
-    <script src="workspace.js?v=115"></script>
-    <script src="chat.js?v=115"></script>
-    <script src="app.js?v=115"></script>
+    <script src="utils.js?v=116"></script>
+    <script src="themes.js?v=116"></script>
+    <script src="markdown.js?v=116"></script>
+    <script src="commands.js?v=116"></script>
+    <script src="sessions.js?v=116"></script>
+    <script src="workspace.js?v=116"></script>
+    <script src="chat.js?v=116"></script>
+    <script src="app.js?v=116"></script>
 </body>
 </html>

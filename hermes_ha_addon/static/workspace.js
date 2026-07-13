@@ -43,6 +43,8 @@
                 this.show();
             } else if (tabName === 'skills') {
                 this.loadSkills();
+            } else if (tabName === 'toolsets') {
+                this.loadToolsets();
             }
         }
 
@@ -56,6 +58,8 @@
             document.getElementById('workspace').style.display = 'flex';
             if (this.currentTab === 'skills') {
                 this.loadSkills();
+            } else if (this.currentTab === 'toolsets') {
+                this.loadToolsets();
             } else if (this.fileTree.length === 0) {
                 this.listFiles(this.currentPath);
             }
@@ -331,6 +335,100 @@
                 });
             } catch (e) {
                 console.error('Skills load error:', e);
+                this._renderError(e.message);
+            }
+        }
+
+        // ── Toolsets Browser ────────────────────────────────────────────
+
+        async loadToolsets() {
+            const container = document.getElementById('workspace-content');
+            if (!container) return;
+            container.innerHTML = '<div class="workspace-loading">Loading toolsets...</div>';
+
+            try {
+                const resp = await HermesUtils.fetchWithTimeout(
+                    `${HERMES_BASE}/api/toolsets?profile=${this.app.activeProfile}`,
+                    { timeoutMs: 10000 }
+                );
+                if (!resp.ok) {
+                    this._renderError(`Failed to load toolsets: ${resp.status}`);
+                    return;
+                }
+                const data = await resp.json();
+                const toolsets = data.data || data.toolsets || [];
+                if (toolsets.length === 0) {
+                    container.innerHTML = '<div class="workspace-placeholder">No toolsets found for this profile.</div>';
+                    return;
+                }
+                let html = '<div class="toolset-list">';
+                toolsets.forEach(ts => {
+                    const name = HermesUtils.escapeHtml(ts.name || 'unknown');
+                    const label = HermesUtils.escapeHtml(ts.label || '');
+                    const desc = HermesUtils.escapeHtml(ts.description || '');
+                    const enabled = ts.enabled;
+                    const configured = ts.configured;
+                    const tools = ts.tools || [];
+                    const statusIcon = enabled ? '✅' : (configured ? '⏸️' : '⚠️');
+                    const statusClass = enabled ? 'toolset-enabled' : (configured ? 'toolset-paused' : 'toolset-unconfigured');
+
+                    html += `<div class="toolset-card ${statusClass}" data-toolset="${name}">`;
+                    html += `<div class="toolset-header">`;
+                    html += `<span class="toolset-icon">${statusIcon}</span>`;
+                    html += `<span class="toolset-name">${label || name}</span>`;
+                    html += `<label class="toolset-toggle">`;
+                    html += `<input type="checkbox" ${enabled ? 'checked' : ''} ${!configured ? 'disabled' : ''} data-toolset="${name}">`;
+                    html += `<span class="toolset-slider"></span>`;
+                    html += `</label>`;
+                    html += `</div>`;
+                    if (desc) {
+                        html += `<div class="toolset-desc">${desc}</div>`;
+                    }
+                    if (tools.length > 0) {
+                        html += `<div class="toolset-tools">`;
+                        tools.forEach(t => {
+                            html += `<span class="toolset-tool-tag">${HermesUtils.escapeHtml(t)}</span>`;
+                        });
+                        html += `</div>`;
+                    }
+                    if (!configured) {
+                        html += `<div class="toolset-warning">Not configured</div>`;
+                    }
+                    html += `</div>`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+
+                // Bind toggle switches
+                container.querySelectorAll('.toolset-toggle input[type="checkbox"]').forEach(cb => {
+                    cb.addEventListener('change', async (e) => {
+                        const toolset = e.target.dataset.toolset;
+                        const enabled = e.target.checked;
+                        e.target.disabled = true;
+                        try {
+                            const toggleResp = await HermesUtils.fetchWithTimeout(
+                                `${HERMES_BASE}/api/toolsets/${toolset}?profile=${this.app.activeProfile}`,
+                                {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ enabled }),
+                                    timeoutMs: 5000,
+                                }
+                            );
+                            if (!toggleResp.ok) {
+                                e.target.checked = !enabled;
+                                console.error('Toolset toggle failed:', toggleResp.status);
+                            }
+                        } catch (err) {
+                            e.target.checked = !enabled;
+                            console.error('Toolset toggle error:', err);
+                        } finally {
+                            e.target.disabled = false;
+                        }
+                    });
+                });
+            } catch (e) {
+                console.error('Toolsets load error:', e);
                 this._renderError(e.message);
             }
         }

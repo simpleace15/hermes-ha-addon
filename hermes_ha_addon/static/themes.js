@@ -17,7 +17,11 @@
     const DEFAULT_THEME = 'ha-dark';
 
     function getStoredTheme() {
-        return localStorage.getItem('hermes_theme') || DEFAULT_THEME;
+        const saved = localStorage.getItem('hermes_theme');
+        if (saved) return saved;
+        // No saved preference — detect from system
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        return prefersDark ? 'ha-dark' : 'ha-light';
     }
 
     function setStoredTheme(themeId) {

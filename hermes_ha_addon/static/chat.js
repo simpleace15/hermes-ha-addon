@@ -87,9 +87,123 @@
 
             sendBtn.addEventListener('click', () => this.send());
             stopBtn.addEventListener('click', () => this.stop());
+
+            // Markdown preview toggle
+            this._previewMode = false;
+            const previewBtn = document.getElementById('preview-btn');
+            if (previewBtn) {
+                previewBtn.addEventListener('click', () => this._togglePreview());
+            }
+
+            // Image paste support
+            this._pendingImages = [];
+            input.addEventListener('paste', (e) => {
+                const items = e.clipboardData?.items;
+                if (!items) return;
+                for (const item of items) {
+                    if (item.type.startsWith('image/')) {
+                        const file = item.getAsFile();
+                        if (file) this._handleImageFile(file);
+                    }
+                }
+            });
+
+            // Drag-drop image support
+            const dropZone = document.getElementById('message-input');
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.style.border = '2px dashed var(--primary)';
+            });
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.style.border = '';
+            });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.style.border = '';
+                const files = e.dataTransfer?.files;
+                if (!files) return;
+                for (const file of files) {
+                    if (file.type.startsWith('image/')) {
+                        this._handleImageFile(file);
+                    }
+                }
+            });
         }
 
-        // ── Slash command autocomplete ─────────────────────────────────
+        // ── Markdown Preview Toggle ─────────────────────────────────────
+
+        _togglePreview() {
+            const input = document.getElementById('message-input');
+            this._previewMode = !this._previewMode;
+            if (this._previewMode) {
+                // Show preview
+                const text = input.value.trim();
+                if (!text) return;
+                input.style.display = 'none';
+                let preview = document.getElementById('input-preview');
+                if (!preview) {
+                    preview = document.createElement('div');
+                    preview.id = 'input-preview';
+                    preview.className = 'input-preview message-bubble';
+                    preview.style.maxHeight = '200px';
+                    preview.style.overflowY = 'auto';
+                    input.parentNode.insertBefore(preview, input);
+                }
+                preview.innerHTML = renderMarkdown(text);
+                preview.style.display = 'block';
+            } else {
+                // Back to edit mode
+                input.style.display = '';
+                const preview = document.getElementById('input-preview');
+                if (preview) preview.style.display = 'none';
+            }
+        }
+
+        _handleImageFile(file) {
+            if (file.size > 10 * 1024 * 1024) {
+                this.app.setStatus('Image too large (max 10MB)', 'error');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                this._pendingImages.push({
+                    data: e.target.result,  // data:image/png;base64,...
+                    type: file.type,
+                    name: file.name || 'pasted-image',
+                });
+                this._renderImagePreview();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        _renderImagePreview() {
+            let preview = document.getElementById('image-preview');
+            if (!preview) {
+                preview = document.createElement('div');
+                preview.id = 'image-preview';
+                preview.className = 'image-preview';
+                const inputArea = document.querySelector('.chat-input-area');
+                inputArea.insertBefore(preview, inputArea.firstChild);
+            }
+            if (this._pendingImages.length === 0) {
+                preview.innerHTML = '';
+                preview.style.display = 'none';
+                return;
+            }
+            preview.style.display = 'flex';
+            preview.innerHTML = this._pendingImages.map((img, i) =>
+                `<div class="image-preview-item"><img src="${img.data}" alt="${img.name}"><button class="image-remove" data-idx="${i}">✕</button></div>`
+            ).join('');
+            // Bind remove buttons
+            preview.querySelectorAll('.image-remove').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const idx = parseInt(e.target.dataset.idx);
+                    this._pendingImages.splice(idx, 1);
+                    this._renderImagePreview();
+                });
+            });
+        }
 
         _handleCommandAutocomplete(value) {
             if (!value.startsWith('/')) {
@@ -168,6 +282,11 @@
             input.style.height = 'auto';
             this._hideCommandDropdown();
 
+            // Exit preview mode if active
+            if (this._previewMode) {
+                this._togglePreview();
+            }
+
             // Store in message history
             if (this._messageHistory.length === 0 || this._messageHistory[this._messageHistory.length - 1] !== text) {
                 this._messageHistory.push(text);
@@ -177,7 +296,21 @@
 
             // Build messages array for API
             const msgContent = parsed && parsed.isCommand ? parsed.raw : text;
-            this.messages.push({ role: 'user', content: msgContent });
+            // If we have pending images, send as OpenAI vision format (content array)
+            if (this._pendingImages.length > 0) {
+                const content = [{ type: 'text', text: msgContent }];
+                this._pendingImages.forEach(img => {
+                    content.push({
+                        type: 'image_url',
+                        image_url: { url: img.data },
+                    });
+                });
+                this.messages.push({ role: 'user', content });
+                this._pendingImages = [];
+                this._renderImagePreview();
+            } else {
+                this.messages.push({ role: 'user', content: msgContent });
+            }
 
             // Reset retry count on new message
             this.retryCount = 0;
@@ -257,6 +390,9 @@
                     this._addUsageMetadata(msgEl, usage, responseModel, elapsed);
                 }
 
+                // Browser notification if tab not focused
+                this._notifyOnComplete(accumulatedText);
+
                 // Store assistant response
                 this.messages.push({ role: 'assistant', content: accumulatedText });
 
@@ -276,9 +412,11 @@
                     // Auto-reconnect on network errors
                     if (this.retryCount < MAX_RETRIES && !e.message.includes('40')) {
                         this.retryCount++;
-                        this.app.setStatus(`Reconnecting (${this.retryCount}/${MAX_RETRIES})...`, 'connecting');
-                        bubble.innerHTML = `<div class="reconnect-banner">Connection lost. Retrying... (${this.retryCount}/${MAX_RETRIES})</div>`;
-                        await new Promise(r => setTimeout(r, 1000 * this.retryCount));
+                        const delay = 1000 * this.retryCount;
+                        const countdown = Math.ceil(delay / 1000);
+                        this.app.setStatus(`Reconnecting in ${countdown}s (${this.retryCount}/${MAX_RETRIES})...`, 'connecting');
+                        bubble.innerHTML = `<div class="reconnect-banner">Connection lost. Retrying in ${countdown}s... (${this.retryCount}/${MAX_RETRIES})</div>`;
+                        await new Promise(r => setTimeout(r, delay));
                         // Retry with same messages
                         this.isStreaming = false;
                         bubble.remove();
@@ -633,6 +771,35 @@
                 });
                 pre.appendChild(btn);
             });
+        }
+
+        // ── Browser Notifications ─────────────────────────────────────────
+
+        _notifyOnComplete(text) {
+            if (document.hasFocus()) return;  // Only notify if tab not focused
+            const preview = HermesUtils.truncate(text.replace(/[#*`]/g, '').trim(), 100);
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Hermes Agent', {
+                    body: preview || 'Response complete',
+                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%2303a9f4" stroke-width="2"><path d="M12 2a3 3 0 0 1 3 3c0 1.5-1 2-1 3v1h2a4 4 0 0 1 4 4v2H4v-2a4 4 0 0 1 4-4h2V8c0-1-1-1.5-1-3a3 3 0 0 1 3-3z"/></svg>',
+                });
+            }
+            // Also flash the favicon/title as fallback
+            if (!document.hasFocus()) {
+                const origTitle = document.title;
+                document.title = '● Hermes Agent — Response ready';
+                const onFocus = () => {
+                    document.title = origTitle;
+                    document.removeEventListener('focus', onFocus);
+                };
+                document.addEventListener('focus', onFocus);
+            }
+        }
+
+        requestNotificationPermission() {
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
         }
 
         // ── Usage Metadata ───────────────────────────────────────────────

@@ -21,11 +21,17 @@
                 this.createSession();
             });
 
-            // Export session button
+            // Export session buttons
             const exportBtn = document.getElementById('export-session-btn');
             if (exportBtn) {
                 exportBtn.addEventListener('click', () => {
                     this.exportSession();
+                });
+            }
+            const exportJsonBtn = document.getElementById('export-json-btn');
+            if (exportJsonBtn) {
+                exportJsonBtn.addEventListener('click', () => {
+                    this.exportSessionJSON();
                 });
             }
 
@@ -123,9 +129,20 @@
                 msgs.forEach(msg => {
                     const role = msg.role || 'assistant';
                     let content = msg.content || '';
-                    // Handle tool messages — content may be JSON
+                    // Handle tool messages — show as collapsed cards
                     if (role === 'tool' || role === 'function') {
-                        // Skip tool messages in display, but keep for context
+                        if (content) {
+                            const toolName = msg.name || msg.tool || 'tool';
+                            const preview = HermesUtils.truncate(String(content), 200);
+                            const card = document.createElement('div');
+                            card.className = 'tool-progress completed';
+                            card.innerHTML = `<span class="tool-icon">🔧</span><span class="tool-name">${HermesUtils.escapeHtml(toolName)}</span><div class="tool-detail">${HermesUtils.escapeHtml(preview)}</div>`;
+                            const messagesEl = document.getElementById('messages');
+                            const wrapper = document.createElement('div');
+                            wrapper.className = 'message assistant';
+                            wrapper.appendChild(card);
+                            messagesEl.appendChild(wrapper);
+                        }
                         return;
                     }
                     // Handle content arrays (some APIs return content as array of parts)
@@ -227,8 +244,13 @@
                 const source = s.source || s.channel || 'cli';
                 const time = this._formatTime(s.last_active || s.started_at || s.updated_at || s.created_at);
                 const isActive = id === this.activeSessionId;
-                const preview = s.preview ? this._truncate(s.preview, 60) : '';
+                const preview = s.preview ? HermesUtils.truncate(s.preview, 60) : '';
                 const msgCount = s.message_count || 0;
+                const toolCount = s.tool_call_count || 0;
+                const inputTokens = s.input_tokens || 0;
+                const outputTokens = s.output_tokens || 0;
+                const cost = s.estimated_cost_usd;
+                const model = s.model;
 
                 html += `<div class="session-item ${isActive ? 'active' : ''}" data-session-id="${id}">`;
                 html += `<div class="session-title">${this._escapeHtml(title)}</div>`;
@@ -237,8 +259,22 @@
                 }
                 html += `<div class="session-meta">`;
                 html += `<span class="session-source">${source}</span>`;
+                if (model) {
+                    html += `<span class="session-badge session-model">${this._escapeHtml(model)}</span>`;
+                }
                 if (msgCount > 0) {
                     html += `<span class="session-msgs">${msgCount} msgs</span>`;
+                }
+                if (toolCount > 0) {
+                    html += `<span class="session-badge session-tools">🔧 ${toolCount}</span>`;
+                }
+                if (inputTokens > 0 || outputTokens > 0) {
+                    const totalTok = inputTokens + outputTokens;
+                    const tokStr = totalTok >= 1000 ? (totalTok / 1000).toFixed(1) + 'k' : totalTok;
+                    html += `<span class="session-badge session-tokens">📊 ${tokStr}</span>`;
+                }
+                if (cost != null && cost > 0) {
+                    html += `<span class="session-badge session-cost">$${cost.toFixed(4)}</span>`;
                 }
                 html += `<span>${time}</span>`;
                 html += `<span class="session-delete" data-delete="${id}" title="Delete">🗑</span>`;
@@ -379,6 +415,7 @@
                 const result = await resp.json();
                 const msgs = Array.isArray(result) ? result : (result.data || result.messages || []);
 
+                // Export as Markdown
                 let md = `# Session Export: ${this.activeSessionId}\n\n`;
                 msgs.forEach(msg => {
                     const role = msg.role || 'assistant';
@@ -390,20 +427,62 @@
                     md += `## ${role}\n\n${content}\n\n---\n\n`;
                 });
 
-                const blob = new Blob([md], { type: 'text/markdown' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `session_${this.activeSessionId}.md`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                this.app.setStatus('Session exported', 'ok');
+                this._downloadFile(md, `session_${this.activeSessionId}.md`, 'text/markdown');
+                this.app.setStatus('Session exported (Markdown)', 'ok');
             } catch (e) {
                 console.error('Export session error:', e);
                 this.app.setStatus('Failed to export session', 'error');
             }
+        }
+
+        async exportSessionJSON() {
+            if (!this.activeSessionId) {
+                this.app.setStatus('No active session to export', 'error');
+                return;
+            }
+            this.app.setStatus('Exporting session as JSON...', 'connecting');
+            try {
+                // Fetch both session metadata and messages
+                const [sessionResp, msgsResp] = await Promise.all([
+                    HermesUtils.fetchWithTimeout(
+                        `${HERMES_BASE}/api/sessions/${this.activeSessionId}?profile=${this.app.activeProfile}`,
+                        { timeoutMs: 10000 }
+                    ),
+                    HermesUtils.fetchWithTimeout(
+                        `${HERMES_BASE}/api/sessions/${this.activeSessionId}/messages?profile=${this.app.activeProfile}`,
+                        { timeoutMs: 15000 }
+                    ),
+                ]);
+
+                const sessionData = sessionResp.ok ? await sessionResp.json() : {};
+                const msgsResult = msgsResp.ok ? await msgsResp.json() : {};
+                const msgs = Array.isArray(msgsResult) ? msgsResult : (msgsResult.data || msgsResult.messages || []);
+
+                const exportObj = {
+                    export_date: new Date().toISOString(),
+                    session: sessionData.session || sessionData,
+                    messages: msgs,
+                };
+
+                const json = JSON.stringify(exportObj, null, 2);
+                this._downloadFile(json, `session_${this.activeSessionId}.json`, 'application/json');
+                this.app.setStatus('Session exported (JSON)', 'ok');
+            } catch (e) {
+                console.error('Export JSON error:', e);
+                this.app.setStatus('Failed to export session', 'error');
+            }
+        }
+
+        _downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         _formatTime(ts) {
