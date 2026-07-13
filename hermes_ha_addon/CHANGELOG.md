@@ -1,3 +1,9 @@
+## 1.1.3 (2026-07-12)
+
+### Changed
+- Assistant message label now shows the active profile name instead of "assistant"
+- User message label shows "You" instead of "user"
+
 ## 1.1.2 (2026-07-12)
 
 ### Fixed

@@ -658,7 +658,12 @@
 
             const roleLabel = document.createElement('div');
             roleLabel.className = 'message-role';
-            roleLabel.textContent = role;
+            // Show profile name for assistant messages, "You" for user messages
+            if (role === 'assistant') {
+                roleLabel.textContent = this.app.activeProfile || 'assistant';
+            } else {
+                roleLabel.textContent = role === 'user' ? 'You' : role;
+            }
 
             const bubble = document.createElement('div');
             bubble.className = 'message-bubble';
