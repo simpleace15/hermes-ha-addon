@@ -43,6 +43,32 @@
                 }
             });
 
+            // Message history — Up/Down arrow to recall previous messages
+            this._messageHistory = [];
+            this._historyIndex = -1;
+            input.addEventListener('keydown', (e) => {
+                if (this._commandState && this._commandState.visible) return;
+                if (e.key === 'ArrowUp' && input.value === '') {
+                    // Recall previous message
+                    if (this._messageHistory.length > 0) {
+                        this._historyIndex = Math.min(this._historyIndex + 1, this._messageHistory.length - 1);
+                        input.value = this._messageHistory[this._messageHistory.length - 1 - this._historyIndex];
+                        // Place cursor at end
+                        input.setSelectionRange(input.value.length, input.value.length);
+                        e.preventDefault();
+                    }
+                } else if (e.key === 'ArrowDown' && this._historyIndex >= 0) {
+                    this._historyIndex--;
+                    if (this._historyIndex < 0) {
+                        input.value = '';
+                    } else {
+                        input.value = this._messageHistory[this._messageHistory.length - 1 - this._historyIndex];
+                    }
+                    input.setSelectionRange(input.value.length, input.value.length);
+                    e.preventDefault();
+                }
+            });
+
             // Auto-resize textarea
             input.addEventListener('input', () => {
                 input.style.height = 'auto';
@@ -141,6 +167,13 @@
             input.value = '';
             input.style.height = 'auto';
             this._hideCommandDropdown();
+
+            // Store in message history
+            if (this._messageHistory.length === 0 || this._messageHistory[this._messageHistory.length - 1] !== text) {
+                this._messageHistory.push(text);
+                if (this._messageHistory.length > 50) this._messageHistory.shift();
+            }
+            this._historyIndex = -1;
 
             // Build messages array for API
             const msgContent = parsed && parsed.isCommand ? parsed.raw : text;
@@ -697,9 +730,7 @@
         }
 
         _escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = String(text);
-            return div.innerHTML;
+            return HermesUtils.escapeHtml(text);
         }
 
         clear() {

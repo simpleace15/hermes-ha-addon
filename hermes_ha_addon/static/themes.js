@@ -74,6 +74,19 @@
                 applyTheme(e.target.value);
             });
         }
+
+        // Make theme icon clickable — cycles through themes
+        const iconEl = document.getElementById('theme-icon');
+        if (iconEl) {
+            iconEl.style.cursor = 'pointer';
+            iconEl.title = 'Click to cycle themes';
+            iconEl.addEventListener('click', () => {
+                const current = getStoredTheme();
+                const idx = THEMES.findIndex(t => t.id === current);
+                const next = THEMES[(idx + 1) % THEMES.length];
+                applyTheme(next.id);
+            });
+        }
     }
 
     // Expose for app.js to call after DOM ready

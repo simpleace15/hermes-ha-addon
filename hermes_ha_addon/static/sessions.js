@@ -41,7 +41,10 @@
          */
         async fetchSessions() {
             try {
-                const resp = await fetch(`${HERMES_BASE}/api/sessions?profile=${this.app.activeProfile}&limit=50`);
+                const resp = await HermesUtils.fetchWithTimeout(
+                    `${HERMES_BASE}/api/sessions?profile=${this.app.activeProfile}&limit=50`,
+                    { timeoutMs: 15000 }
+                );
                 if (!resp.ok) {
                     console.error('Failed to fetch sessions:', resp.status);
                     this.sessions = [];
@@ -77,8 +80,9 @@
                     return null;
                 }
 
-                const session = await resp.json();
-                this.activeSessionId = session.id || session.session_id;
+                const sessionResp = await resp.json();
+                // API returns {object: "hermes.session", session: {id: "..."}}
+                this.activeSessionId = sessionResp.session?.id || sessionResp.id || sessionResp.session_id;
                 this.app.clearChat();
                 this.app.setStatus('New session started', 'ok');
                 this.fetchSessions(); // Refresh list
@@ -99,8 +103,9 @@
             this.app.setStatus('Loading session...', 'connecting');
 
             try {
-                const resp = await fetch(
-                    `${HERMES_BASE}/api/sessions/${sessionId}/messages?profile=${this.app.activeProfile}`
+                const resp = await HermesUtils.fetchWithTimeout(
+                    `${HERMES_BASE}/api/sessions/${sessionId}/messages?profile=${this.app.activeProfile}`,
+                    { timeoutMs: 15000 }
                 );
                 if (!resp.ok) {
                     console.error('Load session failed:', resp.status);
@@ -185,8 +190,9 @@
                 const forked = await resp.json();
                 this.app.setStatus('Session forked', 'ok');
                 this.fetchSessions();
-                if (forked.id || forked.session_id) {
-                    this.loadSession(forked.id || forked.session_id);
+                const forkedId = forked.session?.id || forked.id || forked.session_id;
+                if (forkedId) {
+                    this.loadSession(forkedId);
                 }
             } catch (e) {
                 console.error('Fork session error:', e);
@@ -221,11 +227,19 @@
                 const source = s.source || s.channel || 'cli';
                 const time = this._formatTime(s.last_active || s.started_at || s.updated_at || s.created_at);
                 const isActive = id === this.activeSessionId;
+                const preview = s.preview ? this._truncate(s.preview, 60) : '';
+                const msgCount = s.message_count || 0;
 
                 html += `<div class="session-item ${isActive ? 'active' : ''}" data-session-id="${id}">`;
                 html += `<div class="session-title">${this._escapeHtml(title)}</div>`;
+                if (preview) {
+                    html += `<div class="session-preview">${this._escapeHtml(preview)}</div>`;
+                }
                 html += `<div class="session-meta">`;
                 html += `<span class="session-source">${source}</span>`;
+                if (msgCount > 0) {
+                    html += `<span class="session-msgs">${msgCount} msgs</span>`;
+                }
                 html += `<span>${time}</span>`;
                 html += `<span class="session-delete" data-delete="${id}" title="Delete">🗑</span>`;
                 html += `</div>`;
@@ -353,8 +367,9 @@
             }
             this.app.setStatus('Exporting session...', 'connecting');
             try {
-                const resp = await fetch(
-                    `${HERMES_BASE}/api/sessions/${this.activeSessionId}/messages?profile=${this.app.activeProfile}`
+                const resp = await HermesUtils.fetchWithTimeout(
+                    `${HERMES_BASE}/api/sessions/${this.activeSessionId}/messages?profile=${this.app.activeProfile}`,
+                    { timeoutMs: 15000 }
                 );
                 if (!resp.ok) {
                     console.error('Export: failed to fetch messages:', resp.status);
@@ -413,9 +428,11 @@
         }
 
         _escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+            return HermesUtils.escapeHtml(text);
+        }
+
+        _truncate(text, maxLen) {
+            return HermesUtils.truncate(text, maxLen);
         }
 
         /**

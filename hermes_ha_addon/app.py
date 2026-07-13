@@ -16,11 +16,11 @@ from flask import (
 )
 
 import requests
-from hermes_proxy import HermesProxy, HermesAPIError, DEFAULT_TIMEOUT
+from hermes_proxy import HermesProxy, HermesAPIError, DEFAULT_TIMEOUT, STREAM_CONNECT_TIMEOUT
 from profile_registry import ProfileRegistry
 
 # ── Config from HA add-on options ─────────────────────────────────────
-HERMES_HOST = os.environ.get("HERMES_HOST", "")
+HERMES_HOST = os.environ.get("HERMES_HOST", "").rstrip("/")
 HERMES_API_KEY = os.environ.get("HERMES_API_KEY", "")
 REGISTRY_PORT = os.environ.get("REGISTRY_PORT", "8641")
 DEFAULT_PROFILE = os.environ.get("DEFAULT_PROFILE", "default")
@@ -49,6 +49,12 @@ logging.basicConfig(
 # Also set werkzeug (Flask request logger) to same level
 logging.getLogger("werkzeug").setLevel(LEVELS.get(LOG_LEVEL, logging.INFO))
 log = logging.getLogger("hermes_addon")
+
+# Validate critical config
+if not HERMES_HOST:
+    log.error("HERMES_HOST is not configured! Set 'hermes_host' in the HA add-on config to your Hermes VM address")
+if not HERMES_API_KEY:
+    log.error("HERMES_API_KEY is not configured! Set 'hermes_api_key' in the HA add-on config")
 
 # ── Flask App ─────────────────────────────────────────────────────────
 app = Flask(__name__, static_folder="static", static_url_path="/static")
@@ -227,7 +233,7 @@ def chat():
     model = data.get("model")
     session_id = data.get("session_id")
     profile = data.get("profile", DEFAULT_PROFILE)
-    stream_options = data.get("stream_options", {})
+    stream_options = data.get("stream_options")  # Only forward if explicitly sent
 
     port = resolve_port(profile)
     log.info("Chat request: profile=%s port=%s model=%s msgs=%d stream_options=%s",
@@ -275,18 +281,93 @@ def chat():
     )
 
 
-@app.route("/api/sessions/<session_id>/chat/stream", methods=["POST"])
-def session_chat_stream(session_id):
-    """Proxy per-session streaming chat (POST /api/sessions/{id}/chat/stream)."""
+# ── Routes: Responses API (SSE Streaming) ─────────────────────────────
+
+@app.route("/api/responses", methods=["POST"])
+def responses_stream():
+    """
+    Proxy the Responses API (/v1/responses) with SSE streaming.
+    This is the richer API that supports run events, approval flows,
+    and structured tool progress.
+    """
     data = request.get_json(silent=True) or {}
-    message = data.get("message", "")
     profile = data.get("profile", DEFAULT_PROFILE)
     port = resolve_port(profile)
-    log.info("Session chat stream: profile=%s port=%s session=%s", profile, port, session_id)
+    log.info("Responses request: profile=%s port=%s", profile, port)
+
+    # Build the request to Hermes — pass through all fields except profile
+    hermes_data = {k: v for k, v in data.items() if k != "profile"}
+
     try:
-        resp = proxy.session_chat_stream(port, session_id, message)
-    except HermesAPIError as e:
-        return jsonify({"error": e.body}), e.status_code
+        url = proxy.profile_url(port, "v1/responses")
+        resp = requests.post(
+            url,
+            headers=proxy.auth_headers,
+            json=hermes_data,
+            stream=True,
+            timeout=(STREAM_CONNECT_TIMEOUT, None),
+        )
+        if not resp.ok:
+            error_body = resp.text
+            resp.close()
+            return jsonify({"error": error_body}), resp.status_code
+    except Exception as e:
+        log.error("Responses stream connection failed: %s", e)
+        return jsonify({"error": str(e)}), 502
+
+    def generate():
+        try:
+            for line in resp.iter_lines():
+                if line:
+                    yield line + b"\n"
+                else:
+                    yield b"\n"
+        except Exception as e:
+            log.error("Responses SSE stream interrupted: %s", e)
+            yield f'data: {json.dumps({"error": str(e)})}\n\n'.encode()
+        finally:
+            resp.close()
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+# ── Routes: Run Status & Events ─────────────────────────────────────────
+
+@app.route("/api/runs/<run_id>")
+def get_run_status(run_id):
+    """Get the status of a run."""
+    profile = get_profile_from_request()
+    port = resolve_port(profile)
+    try:
+        url = proxy.profile_url(port, f"v1/runs/{run_id}")
+        resp = requests.get(url, headers=proxy.auth_headers, timeout=DEFAULT_TIMEOUT)
+        return Response(resp.content, status=resp.status_code,
+                        content_type=resp.headers.get("Content-Type", "application/json"))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/runs/<run_id>/events")
+def get_run_events(run_id):
+    """Get run events as SSE stream."""
+    profile = get_profile_from_request()
+    port = resolve_port(profile)
+    try:
+        url = proxy.profile_url(port, f"v1/runs/{run_id}/events")
+        resp = requests.get(url, headers=proxy.auth_headers, stream=True,
+                            timeout=(STREAM_CONNECT_TIMEOUT, None))
+        if not resp.ok:
+            error_body = resp.text
+            resp.close()
+            return jsonify({"error": error_body}), resp.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 502
 
@@ -298,7 +379,7 @@ def session_chat_stream(session_id):
                 else:
                     yield b"\n"
         except Exception as e:
-            log.error("Session SSE stream interrupted: %s", e)
+            log.error("Run events SSE interrupted: %s", e)
             yield f'data: {json.dumps({"error": str(e)})}\n\n'.encode()
         finally:
             resp.close()
@@ -306,8 +387,22 @@ def session_chat_stream(session_id):
     return Response(
         stream_with_context(generate()),
         mimetype="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.route("/api/runs/<run_id>/stop", methods=["POST"])
+def stop_run(run_id):
+    """Stop a running run."""
+    profile = get_profile_from_request()
+    port = resolve_port(profile)
+    try:
+        url = proxy.profile_url(port, f"v1/runs/{run_id}/stop")
+        resp = requests.post(url, headers=proxy.auth_headers, timeout=DEFAULT_TIMEOUT)
+        return Response(resp.content, status=resp.status_code,
+                        content_type=resp.headers.get("Content-Type", "application/json"))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
 
 
 @app.route("/api/sessions/<session_id>", methods=["PATCH"])
@@ -430,7 +525,7 @@ def workspace_list():
         "Use the search_files tool with target='files' to find files. "
         "Return ONLY the file listing as a simple list, one entry per line. "
         "Prefix directories with [DIR] and files with [FILE]. "
-        "Do not include any other commentary."
+        "Do not include any other commentary, headers, or explanations."
     )
 
     try:

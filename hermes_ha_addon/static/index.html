@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hermes Agent Chat</title>
-    <link rel="stylesheet" href="style.css?v=114">
+    <link rel="stylesheet" href="style.css?v=115">
     <script>
         // Detect HA Ingress path prefix from current URL
         // HA Ingress serves under /api/hassio_ingress/<token>/
@@ -21,7 +21,7 @@
                     prefix = '/' + parts[1] + '/' + parts[2] + '/' + parts[3];
                 }
             }
-            window.HERMES_BASE = prefix;
+            window.HERMES_BASE = prefix || '';
             console.log('Hermes Ingress prefix:', window.HERMES_BASE);
         })();
 
@@ -159,12 +159,13 @@
     </div>
 
     <!-- Scripts (order matters — dependencies first) -->
-    <script src="themes.js?v=114"></script>
-    <script src="markdown.js?v=114"></script>
-    <script src="commands.js?v=114"></script>
-    <script src="sessions.js?v=114"></script>
-    <script src="workspace.js?v=114"></script>
-    <script src="chat.js?v=114"></script>
-    <script src="app.js?v=114"></script>
+    <script src="utils.js?v=115"></script>
+    <script src="themes.js?v=115"></script>
+    <script src="markdown.js?v=115"></script>
+    <script src="commands.js?v=115"></script>
+    <script src="sessions.js?v=115"></script>
+    <script src="workspace.js?v=115"></script>
+    <script src="chat.js?v=115"></script>
+    <script src="app.js?v=115"></script>
 </body>
 </html>

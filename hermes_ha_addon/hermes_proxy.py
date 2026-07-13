@@ -230,19 +230,6 @@ class HermesProxy:
 
         return resp
 
-    def session_chat_stream(self, port, session_id, message):
-        """Use the per-session streaming endpoint."""
-        url = self.profile_url(port, f"api/sessions/{session_id}/chat/stream")
-        resp = requests.post(
-            url, headers=self.auth_headers, json={"message": message},
-            stream=True, timeout=(STREAM_CONNECT_TIMEOUT, None),
-        )
-        if not resp.ok:
-            error_body = resp.text
-            resp.close()
-            raise HermesAPIError(resp.status_code, error_body)
-        return resp
-
     # ── Chat (Non-Streaming — for workspace queries) ────────────────────
 
     def chat_sync(self, port, messages, model=None, session_id=None):
@@ -265,7 +252,7 @@ class HermesProxy:
             url,
             headers=self.auth_headers,
             json=body,
-            timeout=60,  # longer timeout for tool execution
+            timeout=120,  # 2min timeout for tool execution (was 60, too short for some queries)
         )
         if not resp.ok:
             raise HermesAPIError(resp.status_code, resp.text)

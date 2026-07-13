@@ -15,6 +15,8 @@
             this.loading = false;
             this.fileTree = [];
             this.currentTab = 'files';
+            this._cache = new Map();  // path → {tree, timestamp}
+            this._cacheTTL = 30000;   // 30 seconds
 
             document.getElementById('workspace-toggle').addEventListener('click', () => {
                 this.toggle();
@@ -70,16 +72,27 @@
         async listFiles(path) {
             this.currentPath = path;
             this.loading = true;
+
+            // Check cache first
+            const cached = this._cache.get(path);
+            if (cached && (Date.now() - cached.timestamp) < this._cacheTTL) {
+                this.fileTree = cached.tree;
+                this._renderFileTree();
+                this.loading = false;
+                return;
+            }
+
             this._renderLoading();
 
             try {
-                const resp = await fetch(HERMES_BASE + '/api/workspace/list', {
+                const resp = await HermesUtils.fetchWithTimeout(HERMES_BASE + '/api/workspace/list', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         path: path,
                         profile: this.app.activeProfile,
                     }),
+                    timeoutMs: 120000,  // 2min for agent tool execution
                 });
 
                 if (!resp.ok) {
@@ -90,6 +103,7 @@
 
                 const data = await resp.json();
                 this.fileTree = this._parseFileList(data.files || '');
+                this._cache.set(path, { tree: this.fileTree, timestamp: Date.now() });
                 this._renderFileTree();
             } catch (e) {
                 console.error('Workspace list error:', e);
@@ -106,13 +120,14 @@
             this._renderLoadingFile(filePath);
 
             try {
-                const resp = await fetch(HERMES_BASE + '/api/workspace/read', {
+                const resp = await HermesUtils.fetchWithTimeout(HERMES_BASE + '/api/workspace/read', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         path: filePath,
                         profile: this.app.activeProfile,
                     }),
+                    timeoutMs: 120000,
                 });
 
                 if (!resp.ok) {
@@ -228,7 +243,10 @@
 
             const refreshBtn = document.getElementById('workspace-refresh');
             if (refreshBtn) {
-                refreshBtn.addEventListener('click', () => this.listFiles(this.currentPath));
+                refreshBtn.addEventListener('click', () => {
+                    this._cache.delete(this.currentPath);
+                    this.listFiles(this.currentPath);
+                });
             }
         }
 
@@ -272,7 +290,10 @@
             container.innerHTML = '<div class="workspace-loading">Loading skills...</div>';
 
             try {
-                const resp = await fetch(`${HERMES_BASE}/api/skills?profile=${this.app.activeProfile}`);
+                const resp = await HermesUtils.fetchWithTimeout(
+                    `${HERMES_BASE}/api/skills?profile=${this.app.activeProfile}`,
+                    { timeoutMs: 10000 }
+                );
                 if (!resp.ok) {
                     this._renderError(`Failed to load skills: ${resp.status}`);
                     return;
@@ -315,13 +336,11 @@
         }
 
         _escapeAttr(text) {
-            return String(text).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return HermesUtils.escapeAttr(text);
         }
 
         _escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = String(text);
-            return div.innerHTML;
+            return HermesUtils.escapeHtml(text);
         }
     }
 

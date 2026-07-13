@@ -110,7 +110,8 @@
             this.setStatus('Discovering profiles...', 'connecting');
 
             try {
-                const resp = await fetch(HERMES_BASE + '/api/profiles');
+                const resp = await HermesUtils.fetchWithTimeout(HERMES_BASE + '/api/profiles',
+                    { timeoutMs: 10000 });
                 if (!resp.ok) {
                     this.setStatus('Failed to discover profiles', 'error');
                     this._renderProfileError('Could not reach the profile registry');
@@ -168,8 +169,17 @@
 
         _renderProfileError(msg) {
             const selector = document.getElementById('profile-selector');
-            selector.innerHTML = `<option value="" disabled>${msg}</option>`;
+            selector.innerHTML = `<option value="" disabled>${this._escapeHtml(msg)}</option>`;
             this.setConnectionStatus('offline');
+
+            // Show a prominent error banner in the chat area
+            const messages = document.getElementById('messages');
+            if (messages && messages.children.length === 0) {
+                const banner = document.createElement('div');
+                banner.className = 'error-banner';
+                banner.innerHTML = `<strong>Configuration Error</strong><br>${this._escapeHtml(msg)}<br><br>Check the add-on configuration in Home Assistant → Settings → Add-ons → Hermes Agent Chat.`;
+                messages.appendChild(banner);
+            }
         }
 
         switchProfile(profileName) {
@@ -210,7 +220,10 @@
             const selector = document.getElementById('model-selector');
             if (!selector) return;
             try {
-                const resp = await fetch(`${HERMES_BASE}/api/models?profile=${this.activeProfile}`);
+                const resp = await HermesUtils.fetchWithTimeout(
+                    `${HERMES_BASE}/api/models?profile=${this.activeProfile}`,
+                    { timeoutMs: 10000 }
+                );
                 if (!resp.ok) {
                     console.warn('Failed to load models:', resp.status);
                     return;
@@ -232,19 +245,20 @@
         }
 
         _escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = String(text);
-            return div.innerHTML;
+            return HermesUtils.escapeHtml(text);
         }
 
         _escapeAttr(text) {
-            return String(text).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return HermesUtils.escapeAttr(text);
         }
 
         async _checkConnection() {
             this.setConnectionStatus('connecting');
             try {
-                const resp = await fetch(`${HERMES_BASE}/api/capabilities?profile=${this.activeProfile}`);
+                const resp = await HermesUtils.fetchWithTimeout(
+                    `${HERMES_BASE}/api/capabilities?profile=${this.activeProfile}`,
+                    { timeoutMs: 10000 }
+                );
                 if (resp.ok) {
                     this.setConnectionStatus('online');
                 } else {
@@ -344,5 +358,14 @@
         const app = new HermesApp();
         window.hermesApp = app; // Expose for debugging
         app.init();
+    });
+
+    // Global error boundary — catch unhandled promise rejections
+    window.addEventListener('unhandledrejection', (e) => {
+        console.error('[hermes] Unhandled rejection:', e.reason);
+        const app = window.hermesApp;
+        if (app && e.reason && e.reason.message) {
+            app.setStatus(`Error: ${e.reason.message.substring(0, 60)}`, 'error');
+        }
     });
 })();

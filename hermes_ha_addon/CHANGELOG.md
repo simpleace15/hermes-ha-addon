@@ -1,3 +1,27 @@
+## 1.2.0 (2026-07-12)
+
+### Bug Fixes
+- **Session rename fixed** — API returns session object nested under `session` key; `createSession` and `forkSession` now correctly extract `session.id`
+- **Nested git repo removed** — `hermes-ha-addon/hermes-ha-addon/` submodule reference cleaned up
+- **Config validation** — clear error logged when HERMES_HOST or HERMES_API_KEY not configured, with prominent error banner in UI
+- **Workspace browser improved** — 30s cache for directory listings, "Refresh" button bypasses cache, 120s timeout (was 60s), better prompt to reduce agent commentary
+- **stream_options** — no longer sends empty `{}` to Hermes if frontend doesn't include it
+- **HERMES_BASE fallback** — defaults to `''` instead of undefined when not in Ingress mode
+
+### Code Quality
+- **Shared utils.js** — `escapeHtml`, `escapeAttr`, `truncate`, `fetchWithTimeout` extracted from 5 duplicate implementations into one file
+- **Request timeouts** — all non-streaming fetch calls now use `fetchWithTimeout` (10-15s for API calls, 120s for workspace)
+- **Global error boundary** — `unhandledrejection` listener catches promise rejections and shows status bar error
+- **Dead code removed** — `session_chat_stream` method and route deleted (frontend uses `/api/chat` instead)
+- **Theme icon clickable** — clicking the emoji cycles through themes
+- **CSS fix** — `pre { position: relative }` moved to the main pre styles, removed duplicate at bottom
+
+### New Features
+- **Session preview in sidebar** — shows first message snippet (like ChatGPT) from `preview` field
+- **Session metadata in sidebar** — message count badge next to each session
+- **Message input history** — press Up arrow (empty input) to recall previous messages, Down to go forward
+- **Responses API routes** — `/api/responses`, `/api/runs/{id}`, `/api/runs/{id}/events`, `/api/runs/{id}/stop` proxy endpoints for the richer Hermes Responses API
+
 ## 1.1.4 (2026-07-12)
 
 ### Fixed
