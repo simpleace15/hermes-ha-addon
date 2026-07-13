@@ -1,3 +1,10 @@
+## 1.1.2 (2026-07-12)
+
+### Fixed
+- Token usage not showing: backend wasn't forwarding `stream_options` to the Hermes API
+- `chat_stream()` now accepts and forwards `stream_options` parameter
+- `chat()` route now extracts `stream_options` from request and passes to proxy
+
 ## 1.1.1 (2026-07-12)
 
 ### Added

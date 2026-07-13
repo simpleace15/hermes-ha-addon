@@ -227,12 +227,14 @@ def chat():
     model = data.get("model")
     session_id = data.get("session_id")
     profile = data.get("profile", DEFAULT_PROFILE)
+    stream_options = data.get("stream_options", {})
 
     port = resolve_port(profile)
     log.info("Chat request: profile=%s port=%s model=%s msgs=%d", profile, port, model, len(messages))
 
     try:
-        resp = proxy.chat_stream(port, messages, model=model, session_id=session_id)
+        resp = proxy.chat_stream(port, messages, model=model, session_id=session_id,
+                                  stream_options=stream_options)
     except HermesAPIError as e:
         log.error("Chat stream error: %s", e)
         return jsonify({"error": e.body}), e.status_code

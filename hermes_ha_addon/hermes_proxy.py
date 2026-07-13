@@ -193,7 +193,7 @@ class HermesProxy:
 
     # ── Chat (SSE Streaming) ──────────────────────────────────────────
 
-    def chat_stream(self, port, messages, model=None, session_id=None):
+    def chat_stream(self, port, messages, model=None, session_id=None, stream_options=None):
         """
         Send a chat request and return a streaming generator.
         Uses POST /v1/chat/completions with stream=true.
@@ -208,6 +208,8 @@ class HermesProxy:
         }
         if session_id:
             body["session_id"] = session_id
+        if stream_options:
+            body["stream_options"] = stream_options
 
         log.debug("Starting SSE stream to %s (model=%s, session=%s)", url, body["model"], session_id)
 
