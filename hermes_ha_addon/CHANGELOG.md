@@ -1,3 +1,15 @@
+## 1.1.4 (2026-07-12)
+
+### Fixed
+- **Browser caching**: static files now served with `Cache-Control: no-cache, no-store, must-revalidate` headers
+- Added cache-busting query strings (`?v=114`) to all script/CSS includes in index.html
+- This was the root cause of token usage not appearing — the browser was serving cached v1.1.0 `chat.js` even after updating the add-on
+
+### Added
+- Debug logging in chat endpoint: logs `stream_options` value, chunk count, and whether usage was seen
+- Console logging in frontend: `console.log('[hermes] Captured usage: ...')` and `console.log('[hermes] Stream done: ...')`
+- Use browser DevTools console (F12) to verify usage data is being captured
+
 ## 1.1.3 (2026-07-12)
 
 ### Changed

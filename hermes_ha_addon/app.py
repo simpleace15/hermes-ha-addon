@@ -230,7 +230,8 @@ def chat():
     stream_options = data.get("stream_options", {})
 
     port = resolve_port(profile)
-    log.info("Chat request: profile=%s port=%s model=%s msgs=%d", profile, port, model, len(messages))
+    log.info("Chat request: profile=%s port=%s model=%s msgs=%d stream_options=%s",
+             profile, port, model, len(messages), stream_options)
 
     try:
         resp = proxy.chat_stream(port, messages, model=model, session_id=session_id,
@@ -244,11 +245,19 @@ def chat():
 
     def generate():
         try:
+            chunk_count = 0
+            has_usage = False
             for line in resp.iter_lines():
                 if line:
                     yield line + b"\n"
+                    chunk_count += 1
+                    # Log usage chunks for debugging
+                    if b'"usage"' in line:
+                        has_usage = True
+                        log.debug("SSE chunk #%d has usage: %s", chunk_count, line[:300])
                 else:
                     yield b"\n"
+            log.info("SSE stream done: %d chunks, has_usage=%s", chunk_count, has_usage)
         except Exception as e:
             log.error("SSE stream interrupted: %s", e)
             yield f'data: {json.dumps({"error": str(e)})}\n\n'.encode()
@@ -505,7 +514,12 @@ def static_files(filename):
     if filename.startswith("api/"):
         return jsonify({"error": "not found"}), 404
     try:
-        return send_from_directory(app.static_folder, filename)
+        resp = send_from_directory(app.static_folder, filename)
+        # Prevent browser from caching stale JS/CSS after add-on updates
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        return resp
     except FileNotFoundError:
         return jsonify({"error": "not found"}), 404
 

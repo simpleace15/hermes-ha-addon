@@ -209,6 +209,8 @@
                 const responseModel = result.model;
                 const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
+                console.log('[hermes] Stream done: usage=', usage, 'model=', responseModel, 'elapsed=', elapsed);
+
                 // Finalize
                 if (accumulatedText) {
                     bubble.innerHTML = renderMarkdown(accumulatedText);
@@ -396,6 +398,7 @@
             // Capture usage from final chunk (has usage, empty delta)
             if (data.usage) {
                 this._capturedUsage = data.usage;
+                console.log('[hermes] Captured usage:', data.usage);
             }
             if (data.model) {
                 this._capturedModel = data.model;
@@ -443,6 +446,7 @@
                 appendText(data.output);
                 if (data.usage) {
                     this._capturedUsage = data.usage;
+                    console.log('[hermes] Captured usage from run.completed:', data.usage);
                 }
                 return;
             }
