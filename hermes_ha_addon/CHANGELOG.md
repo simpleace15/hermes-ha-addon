@@ -1,4 +1,4 @@
-## 2.0.0 (2026-07-15)
+## 2026.07.15 (2026-07-15) — beta
 
 ### Changed
 - **Complete UI redesign** — modern dark-mode-first design system with:
