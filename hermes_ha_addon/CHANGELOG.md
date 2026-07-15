@@ -1,3 +1,8 @@
+## 2026.07.15 (2026-07-15)
+
+### Changed
+- **Switched to date-based versioning** — version numbers are now `YYYY.MM.DD` instead of semver. This simplifies releases: each version is simply the date it was shipped. No more guessing major/minor/patch.
+
 ## 1.3.1 (2026-07-12)
 
 ### Fixed
