@@ -1,3 +1,29 @@
+## 2.0.0 (2026-07-15)
+
+### Changed
+- **Complete UI redesign** — modern dark-mode-first design system with:
+  - Near-black canvas (#0a0a0c) with luminance-stacked surfaces for depth
+  - Indigo-violet accent (#7170ff) replacing the old HA blue
+  - Semi-transparent white borders (rgba(255,255,255,0.07)) for subtle structure
+  - Glassmorphism touches: backdrop-blur on header and input area
+  - Ambient gradient glow at the top of the page for atmosphere
+  - Inter + JetBrains Mono font stack via Google Fonts
+  - Gradient user message bubbles with accent glow shadow
+  - Refined component styling: rounded corners (8-16px), smooth transitions
+  - Pulse animation on connecting status dot
+  - Message slide-in animation
+  - Improved scrollbar styling
+  - Better focus states with accent glow rings
+
+### Removed
+- **Theme system completely removed** — the 4-theme dropdown (HA Dark, HA Light, Midnight, Solarized) was static, didn't work properly in the dropdown, and added complexity. The add-on now has a single polished dark theme that looks great out of the box
+- `themes.js` deleted
+- `theme` option removed from config.yaml (options + schema)
+- `THEME` env var removed from run.sh and app.py
+- `/api/theme` backend endpoint removed
+- Theme selector dropdown and theme icon removed from header
+- All `[data-theme="..."]` CSS blocks removed, replaced with single `:root` token system
+
 ## 1.3.1 (2026-07-12)
 
 ### Fixed

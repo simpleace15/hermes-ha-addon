@@ -18,11 +18,6 @@
         }
 
         async init() {
-            // Initialize theme system
-            if (window.HermesThemes) {
-                HermesThemes.initTheme();
-            }
-
             // Initialize managers
             this.sessionManager = new SessionManager(this);
             this.chatManager = new ChatManager(this);

@@ -6,7 +6,7 @@
 
 ### A full-featured Home Assistant add-on for chatting with your remote Hermes Agent
 
-[![Version](https://img.shields.io/badge/version-1.3.0-blue?style=flat-square)](https://github.com/simpleace15/hermes-ha-addon)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue?style=flat-square)](https://github.com/simpleace15/hermes-ha-addon)
 [![HA Add-on](https://img.shields.io/badge/Home%20Assistant-Add--on-41bdf5?style=flat-square)](https://www.home-assistant.io/)
 [![Stage](https://img.shields.io/badge/stage-experimental-orange?style=flat-square)](https://developers.home-assistant.io/docs/add-ons/)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
@@ -60,8 +60,7 @@
 ### UI / UX
 | Feature | Description |
 |---------|-------------|
-| 🌙 **4 built-in themes** | HA Dark, HA Light, Midnight Purple, Solarized |
-| 🎨 **Auto-theme detection** | Respects your system `prefers-color-scheme` on first visit |
+| 🎨 **Modern dark UI** | Polished dark-mode-first design with depth, glassmorphism touches, and indigo-violet accent |
 | 📱 **Mobile responsive** | Works in the HA companion app — collapsible sidebar and workspace |
 | ⌨️ **Keyboard shortcuts** | `Ctrl+K` focus input, `Ctrl+N` new session, `Ctrl+/` help, `Esc` close panels |
 | 🔄 **Auto-reconnect** | Connection drops trigger exponential backoff with countdown timer |
@@ -142,7 +141,6 @@ That's it. The add-on appears in your HA sidebar as **Hermes Agent** 🤖
 | `default_profile` | no | `default` | Profile to auto-select on first load |
 | `manual_profiles` | no | `[]` | Fallback: list of `{name, port}` pairs if no registry |
 | `log_level` | no | `info` | `debug` / `info` / `warning` / `error` / `critical` |
-| `theme` | no | `ha-dark` | `ha-dark` / `ha-light` / `midnight` / `solarized` |
 
 ### Example config with manual profiles (no registry)
 
@@ -342,14 +340,17 @@ Type `/` to see autocomplete:
 
 See [CHANGELOG.md](hermes_ha_addon/CHANGELOG.md) for full release history.
 
+### v2.0.0 — Modern UI Redesign
+Complete visual overhaul with dark-mode-first design system, glassmorphism touches, indigo-violet accent, Inter + JetBrains Mono typography. Theme system removed in favor of a single polished dark theme.
+
 ### v1.3.0 — Feature Complete
-10 new features including image upload, toolset manager, health indicator, browser notifications, JSON export, markdown preview, tool call history, auto-theme, retry countdown, and session stats.
+10 new features including image upload, toolset manager, health indicator, browser notifications, JSON export, markdown preview, tool call history, retry countdown, and session stats.
 
 ### v1.2.0 — Bug Fixes & Code Quality
 Fixed session rename, removed nested git repo, added config validation, shared utils.js, request timeouts, global error boundary, Responses API routes, session previews.
 
 ### v1.1.x — Foundation
-Token usage metadata, profile name labels, SSE tool streaming, approval dialogs, model selector, skills browser, themes, syntax highlighting, workspace browser.
+Token usage metadata, profile name labels, SSE tool streaming, approval dialogs, model selector, skills browser, syntax highlighting, workspace browser.
 
 ---
 
@@ -372,11 +373,10 @@ hermes_ha_addon/
 │   ├── chat.js         # Chat, SSE streaming, image upload, notifications
 │   ├── sessions.js     # Session list, rename, export, tool call history
 │   ├── workspace.js    # File browser, skills browser, toolset manager
-│   ├── themes.js       # Theme system (4 themes + auto-detection)
 │   ├── markdown.js     # Markdown renderer + syntax highlighter
 │   ├── commands.js     # Slash command system
 │   ├── utils.js        # Shared utilities (escapeHtml, fetchWithTimeout)
-│   └── style.css       # All styling (CSS variables per theme)
+│   └── style.css       # All styling (modern dark design system)
 ├── registry/
 │   ├── hermes_profile_registry.py  # Profile discovery service
 │   └── install.sh                  # One-command installer

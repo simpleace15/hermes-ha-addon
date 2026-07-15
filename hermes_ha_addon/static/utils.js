@@ -1,6 +1,6 @@
 /**
  * utils.js — Shared utility functions used across all modules.
- * Loaded first (after theme inline script, before all other JS).
+ * Loaded first, before all other JS modules.
  */
 (function () {
     'use strict';

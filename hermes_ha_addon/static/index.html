@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <title>Hermes Agent Chat</title>
-    <link rel="stylesheet" href="style.css?v=117">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=200">
     <script>
         // Detect HA Ingress path prefix from current URL
         // HA Ingress serves under /api/hassio_ingress/<token>/
@@ -14,27 +17,13 @@
             var path = window.location.pathname;
             var prefix = '';
             if (path.indexOf('/api/hassio_ingress/') === 0) {
-                // Extract /api/hassio_ingress/<token>
                 var parts = path.split('/');
-                // path = /api/hassio_ingress/<token>/index.html or similar
-                // parts = ['', 'api', 'hassio_ingress', '<token>', ...]
                 if (parts.length >= 4) {
                     prefix = '/' + parts[1] + '/' + parts[2] + '/' + parts[3];
                 }
             }
             window.HERMES_BASE = prefix || '';
             console.log('Hermes Ingress prefix:', window.HERMES_BASE);
-        })();
-
-        // Apply saved theme immediately to prevent flash of wrong theme
-        (function() {
-            var saved = localStorage.getItem('hermes_theme');
-            if (!saved) {
-                // No saved preference — detect from system
-                var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-                saved = prefersDark ? 'ha-dark' : 'ha-light';
-            }
-            document.documentElement.setAttribute('data-theme', saved);
         })();
     </script>
 </head>
@@ -44,14 +33,14 @@
         <header class="header">
             <div class="header-left">
                 <button id="sidebar-toggle" class="icon-btn" title="Toggle sessions">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                         <line x1="3" y1="12" x2="21" y2="12"></line>
                         <line x1="3" y1="6" x2="21" y2="6"></line>
                         <line x1="3" y1="18" x2="21" y2="18"></line>
                     </svg>
                 </button>
                 <div class="logo">
-                    <img src="icon.svg" width="24" height="24" alt="" style="filter: brightness(0) invert(1);" onerror="this.style.display='none'">
+                    <img src="icon.svg" width="24" height="24" alt="" onerror="this.style.display='none'">
                     <span>Hermes Agent</span>
                 </div>
             </div>
@@ -59,22 +48,18 @@
                 <select id="profile-selector" class="profile-selector">
                     <option value="">Loading profiles...</option>
                 </select>
-                <select id="model-selector" class="profile-selector" title="Select model">
+                <select id="model-selector" class="model-selector" title="Select model">
                     <option value="">Auto</option>
                 </select>
                 <span id="model-name" class="model-name"></span>
             </div>
             <div class="header-right">
-                <span id="theme-icon" class="theme-icon" title="Current theme">🎨</span>
-                <select id="theme-selector" class="theme-selector" title="Select theme">
-                    <option value="ha-dark">🌙 HA Dark</option>
-                    <option value="ha-light">☀️ HA Light</option>
-                    <option value="midnight">🌌 Midnight</option>
-                    <option value="solarized">🌴 Solarized</option>
-                </select>
                 <button id="workspace-toggle" class="icon-btn" title="Toggle workspace">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 7h18M3 12h18M3 17h18"></path>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                        <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                        <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+                        <rect x="14" y="14" width="7" height="7" rx="1"></rect>
                     </svg>
                 </button>
             </div>
@@ -89,14 +74,14 @@
                 </div>
                 <div class="sidebar-actions">
                     <button id="new-session-btn" class="btn btn-primary btn-block">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                             <line x1="12" y1="5" x2="12" y2="19"></line>
                             <line x1="5" y1="12" x2="19" y2="12"></line>
                         </svg>
                         New Session
                     </button>
-                    <button id="export-session-btn" class="btn btn-block" style="margin-top:4px;font-size:12px;">Export Session (MD)</button>
-                    <button id="export-json-btn" class="btn btn-block" style="margin-top:4px;font-size:12px;">Export Session (JSON)</button>
+                    <button id="export-session-btn" class="btn btn-block">Export Session (MD)</button>
+                    <button id="export-json-btn" class="btn btn-block">Export Session (JSON)</button>
                 </div>
                 <div id="session-list" class="session-list">
                     <!-- Sessions populated by JS -->
@@ -116,18 +101,18 @@
                             placeholder="Type a message... (or / for commands)"
                             rows="1"></textarea>
                         <button id="preview-btn" class="icon-btn" title="Toggle markdown preview" style="flex-shrink:0;">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                                 <circle cx="12" cy="12" r="3"></circle>
                             </svg>
                         </button>
                         <button id="send-btn" class="btn btn-primary btn-send" title="Send (Enter)">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                                 <line x1="22" y1="2" x2="11" y2="13"></line>
                                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                             </svg>
                         </button>
-                        <button id="stop-btn" class="btn btn-danger btn-stop" style="display:none;" title="Stop">
+                        <button id="stop-btn" class="btn btn-danger btn-send" style="display:none;" title="Stop">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="6" y="6" width="12" height="12"></rect>
                             </svg>
@@ -141,7 +126,7 @@
                 <div class="workspace-header">
                     <h3>Workspace</h3>
                     <button id="workspace-close" class="icon-btn" title="Close">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
@@ -172,13 +157,12 @@
     </div>
 
     <!-- Scripts (order matters — dependencies first) -->
-    <script src="utils.js?v=117"></script>
-    <script src="themes.js?v=117"></script>
-    <script src="markdown.js?v=117"></script>
-    <script src="commands.js?v=117"></script>
-    <script src="sessions.js?v=117"></script>
-    <script src="workspace.js?v=117"></script>
-    <script src="chat.js?v=117"></script>
-    <script src="app.js?v=117"></script>
+    <script src="utils.js?v=200"></script>
+    <script src="markdown.js?v=200"></script>
+    <script src="commands.js?v=200"></script>
+    <script src="sessions.js?v=200"></script>
+    <script src="workspace.js?v=200"></script>
+    <script src="chat.js?v=200"></script>
+    <script src="app.js?v=200"></script>
 </body>
 </html>

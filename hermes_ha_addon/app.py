@@ -25,7 +25,6 @@ HERMES_API_KEY = os.environ.get("HERMES_API_KEY", "")
 REGISTRY_PORT = os.environ.get("REGISTRY_PORT", "8641")
 DEFAULT_PROFILE = os.environ.get("DEFAULT_PROFILE", "default")
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "info").upper()
-THEME = os.environ.get("THEME", "ha-dark")
 
 # Manual profiles come as JSON string from HA options
 _manual_raw = os.environ.get("MANUAL_PROFILES", "[]")
@@ -630,14 +629,6 @@ def workspace_read():
         log.error("workspace_read failed: %s", e)
         log.debug("  traceback: %s", traceback.format_exc())
         return jsonify({"error": str(e)}), 502
-
-
-# ── Routes: Theme Config ──────────────────────────────────────────────
-
-@app.route("/api/theme")
-def get_theme():
-    """Return the configured theme from HA options."""
-    return jsonify({"theme": THEME})
 
 
 # ── Catch-all for static files (Ingress-compatible) ───────────────────
