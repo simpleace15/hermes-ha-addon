@@ -338,6 +338,31 @@ Type `/` to see autocomplete:
 
 ---
 
+## 🔢 Versioning
+
+This add-on uses **date-based versioning** (`YYYY.MM.DD`). Each release is simply the date it was shipped — no semver guesswork.
+
+**Same-day pushes:** If you push more than one version in a day, append a build counter:
+- `2026.07.15` — first push of the day
+- `2026.07.15.1` — second push
+- `2026.07.15.2` — third push
+
+HA Supervisor's `awesomeversion` compares dotted strings correctly, so each increment triggers an update notification.
+
+**Development workflow:**
+1. Clone the repo into your HA local addons folder (or keep a working copy there)
+2. Make changes and test directly in HA — no git push or version bump needed during iteration
+3. When confirmed working, bump the version in all 3 locations (config.yaml, Dockerfile `io.hass.version`, CHANGELOG.md) and update the `?v=` cache-busting strings in index.html
+4. Commit and push to `main` — outside users get the stable release
+
+**Version locations to update on every release:**
+- `config.yaml` → `version:` field
+- `Dockerfile` → `io.hass.version` label
+- `CHANGELOG.md` → new entry at top
+- `static/index.html` → `?v=` query strings on all `<script>` and `<link>` tags
+
+---
+
 ## 📋 Changelog
 
 See [CHANGELOG.md](hermes_ha_addon/CHANGELOG.md) for full release history.
