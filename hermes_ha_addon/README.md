@@ -336,6 +336,42 @@ Type `/` to see autocomplete:
 
 ---
 
+## 🔢 Versioning
+
+This add-on uses **date-based versioning** (`YYYY.MM.DD`) on both branches:
+
+| Branch | Purpose | Version format |
+|--------|---------|----------------|
+| `main` | Stable release (what HA Supervisor pulls) | `YYYY.MM.DD` |
+| `beta` | Testing / development | `YYYY.MM.DD` + optional build counter |
+
+### Same-day pushes to beta
+
+If you push multiple changes to beta on the same day, append a build counter so HA Supervisor detects each update:
+
+| Push | Version |
+|------|---------|
+| 1st push of the day | `2026.07.15` |
+| 2nd push | `2026.07.15.1` |
+| 3rd push | `2026.07.15.2` |
+
+HA's `awesomeversion` library compares dotted version strings correctly, so each increment triggers an update.
+
+### Merging beta to main
+
+When promoting a beta build to stable, use the clean date (drop the counter):
+
+```bash
+git checkout main
+git merge beta
+# Set version to the merge date, e.g. 2026.07.20
+git push origin main
+```
+
+Bump the version in all three places: `config.yaml`, `Dockerfile` (`io.hass.version` label), and `CHANGELOG.md`. Also bump the `?v=` cache-busting query strings in `index.html` to match.
+
+---
+
 ## 📋 Changelog
 
 See [CHANGELOG.md](hermes_ha_addon/CHANGELOG.md) for full release history.
